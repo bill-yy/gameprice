@@ -1,7 +1,8 @@
 <script setup>
 import { Head, Link } from '@inertiajs/vue3';
+import { computed } from 'vue';
 
-defineProps({
+const props = defineProps({
     game: {
         type: Object,
         required: true,
@@ -10,16 +11,49 @@ defineProps({
         type: Array,
         required: true,
     },
+    seo: {
+        type: Object,
+        default: () => ({}),
+    },
 });
 
 const formatDate = (date) => {
     if (!date) return '';
     return new Date(date).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
 };
+
+const genres = computed(() => {
+    const g = props.game.genres;
+    if (Array.isArray(g)) return g;
+    if (typeof g === 'string') {
+        try {
+            const parsed = JSON.parse(g);
+            return Array.isArray(parsed) ? parsed : [g];
+        } catch {
+            return [g];
+        }
+    }
+    return [];
+});
+
+const schemaScript = computed(() => {
+    if (!props.seo.schema) return null;
+    return JSON.stringify(props.seo.schema);
+});
 </script>
 
 <template>
-    <Head :title="game.title" />
+    <Head>
+        <title>{{ seo.title || game.title }}</title>
+        <meta name="description" :content="seo.description" />
+        <link rel="canonical" :href="seo.canonical" />
+        <meta property="og:title" :content="seo.og?.title" />
+        <meta property="og:description" :content="seo.og?.description" />
+        <meta property="og:image" :content="seo.og?.image" />
+        <meta property="og:type" :content="seo.og?.type" />
+        <meta property="og:url" :content="seo.canonical" />
+        <script v-if="schemaScript" type="application/ld+json">{{ schemaScript }}</script>
+    </Head>
 
     <div class="min-h-screen bg-gray-900 text-white">
         <header class="border-b border-gray-700 bg-gray-800">
@@ -54,9 +88,9 @@ const formatDate = (date) => {
                         <span v-if="game.release_date" class="ml-2">&middot; {{ formatDate(game.release_date) }}</span>
                     </p>
 
-                    <div v-if="game.genres?.length" class="mt-4 flex flex-wrap gap-2">
+                    <div v-if="genres.length" class="mt-4 flex flex-wrap gap-2">
                         <span
-                            v-for="genre in game.genres"
+                            v-for="genre in genres"
                             :key="genre"
                             class="rounded-full bg-gray-700 px-3 py-1 text-xs text-gray-300"
                         >
@@ -105,8 +139,8 @@ const formatDate = (date) => {
                                         <span class="font-medium">{{ product.store?.name }}</span>
                                     </div>
                                 </td>
-                                <td class="px-4 py-3 text-gray-300">{{ product.platform }}</td>
-                                <td class="px-4 py-3 text-gray-300">{{ product.region }}</td>
+                                <td class="px-4 py-3 text-gray-300">{{ product.platform || 'Steam' }}</td>
+                                <td class="px-4 py-3 text-gray-300">{{ product.region || 'Global' }}</td>
                                 <td class="px-4 py-3">
                                     <span class="font-bold text-green-400">{{ Number(product.current_price).toFixed(2) }}&euro;</span>
                                     <span v-if="product.original_price && Number(product.original_price) > Number(product.current_price)" class="ml-2 text-xs text-gray-500 line-through">
@@ -114,8 +148,8 @@ const formatDate = (date) => {
                                     </span>
                                 </td>
                                 <td class="px-4 py-3">
-                                    <span v-if="Number(product.discount_percent) > 0" class="font-bold text-red-400">
-                                        -{{ product.discount_percent }}%
+                                    <span v-if="Number(product.discount_percentage) > 0" class="font-bold text-red-400">
+                                        -{{ product.discount_percentage }}%
                                     </span>
                                     <span v-else class="text-gray-500">&mdash;</span>
                                 </td>

@@ -4,12 +4,16 @@ import { Head, Link } from '@inertiajs/vue3';
 import GameCard from '@/Components/GameCard.vue';
 import SearchBar from '@/Components/SearchBar.vue';
 
-defineProps({
+const props = defineProps({
     games: {
         type: Object,
         required: true,
     },
     filters: {
+        type: Object,
+        default: () => ({}),
+    },
+    seo: {
         type: Object,
         default: () => ({}),
     },
@@ -19,7 +23,16 @@ const search = ref('');
 </script>
 
 <template>
-    <Head title="GamePrice.es - Compara precios de videojuegos" />
+    <Head>
+        <title>{{ seo.title || 'GamePrice.es' }}</title>
+        <meta name="description" :content="seo.description" />
+        <link rel="canonical" :href="seo.canonical" />
+        <meta property="og:title" :content="seo.og?.title" />
+        <meta property="og:description" :content="seo.og?.description" />
+        <meta property="og:image" :content="seo.og?.image" />
+        <meta property="og:type" :content="seo.og?.type" />
+        <meta property="og:url" :content="seo.canonical" />
+    </Head>
 
     <div class="min-h-screen bg-gray-900 text-white">
         <header class="border-b border-gray-700 bg-gray-800">
