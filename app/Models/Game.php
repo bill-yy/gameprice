@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'developer',
     'publisher',
     'metacritic_score',
+    'is_active',
 ])]
 class Game extends Model
 {
