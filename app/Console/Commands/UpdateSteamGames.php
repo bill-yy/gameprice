@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\Game;
 use App\Services\Steam\SteamStoreService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Cache;
 
 class UpdateSteamGames extends Command
 {
@@ -43,6 +44,9 @@ class UpdateSteamGames extends Command
         $bar->finish();
         $this->newLine();
         $this->info("Updated {$updated} of {$games->count()} games.");
+
+        Cache::flush();
+        $this->info('Cache flushed successfully.');
 
         return self::SUCCESS;
     }

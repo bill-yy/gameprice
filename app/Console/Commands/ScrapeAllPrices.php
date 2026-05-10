@@ -12,6 +12,7 @@ use App\Services\Affiliates\HumbleBundleService;
 use App\Services\Affiliates\InstantGamingService;
 use App\Services\Affiliates\KinguinService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class ScrapeAllPrices extends Command
@@ -109,6 +110,9 @@ class ScrapeAllPrices extends Command
         $bar->finish();
         $this->newLine();
         $this->info("Created {$created} products, updated {$updated} products.");
+
+        Cache::flush();
+        $this->info('Cache flushed successfully.');
 
         return self::SUCCESS;
     }

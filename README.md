@@ -1,58 +1,104 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# GamePrice - Comparador de Precios de Videojuegos
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+[![Laravel 12](https://img.shields.io/badge/Laravel-12-FF2D20?logo=laravel&logoColor=white)](https://laravel.com)
+[![Vue 3](https://img.shields.io/badge/Vue-3-4FC08D?logo=vue.js&logoColor=white)](https://vuejs.org)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
+[![Pest](https://img.shields.io/badge/Pest-3-FF3E4D?logo=pest&logoColor=white)](https://pestphp.com)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?logo=docker&logoColor=white)](https://docker.com)
+[![Dokploy](https://img.shields.io/badge/Dokploy-Deploy-7C3AED?logo=dokploy&logoColor=white)](https://dokploy.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## About Laravel
+Sitio web automatizado 100% técnico para comparar precios de videojuegos. Sin contenido editorial. Stack moderno.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Características
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- **Comparador de precios en tiempo real** — 6 tiendas afiliadas (Eneba, Instant Gaming, Fanatical, CDKeys, G2A, Humble Bundle)
+- **Alertas de precio por email** — Sistema freemium con notificaciones automáticas
+- **SEO automático** — Schema.org (JSON-LD), OpenGraph, Sitemap XML
+- **Páginas de categoría por género** — Navegación filtrada y optimizada
+- **Sistema de reviews con rating de estrellas** — Reseñas de usuarios con validación
+- **Panel de administración** — Gestión completa del catálogo
+- **Modo oscuro** — Interfaz oscura por defecto
+- **Responsive** — Diseño adaptativo para móvil, tablet y escritorio
+- **Cache Redis** — Respuestas rápidas con caché inteligente
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Screenshots
 
-## Learning Laravel
+<!-- Add screenshots here -->
+| Página principal | Ficha de juego |
+|---|---|
+| *Pending* | *Pending* |
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## Tech Stack
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+| Capa | Tecnología |
+|---|---|
+| **Backend** | Laravel 12, PHP 8.4 |
+| **Frontend** | Vue 3, Inertia.js, Tailwind CSS 4 |
+| **Base de datos** | MySQL 8 |
+| **Cache** | Redis |
+| **Testing** | Pest 3 |
+| **Infraestructura** | Docker, Dokploy |
+| **Scraping** | Artisan commands (Steam API + scrapers) |
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+## Instalación
 
 ```bash
-composer require laravel/boost --dev
+# Clonar el repositorio
+git clone https://github.com/your-user/gameprice.git
+cd gameprice
 
-php artisan boost:install
+# Levantar servicios con Docker
+docker-compose up -d
+
+# Instalar dependencias
+composer install
+npm install
+
+# Configurar entorno
+cp .env.example .env
+php artisan key:generate
+
+# Ejecutar migraciones y seeders
+php artisan migrate
+php artisan db:seed
+
+# Actualizar catálogo desde Steam
+php artisan steam:update-games
+
+# Obtener precios de todas las tiendas
+php artisan prices:scrape-all
+
+# Compilar assets
+npm run build
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+## Despliegue (Dokploy)
 
-## Contributing
+1. Crear un nuevo proyecto en Dokploy
+2. Conectar el repositorio Git
+3. Configurar las variables de entorno (`.env`):
+   - `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD`
+   - `REDIS_HOST`, `REDIS_PASSWORD`
+   - `STEAM_API_KEY`
+   - `SCRAPING_API_KEY` (si aplica)
+4. Configurar el build pack como **Dockerfile** o **Nixpacks**
+5. Desplegar con un click desde el panel
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Monetización
 
-## Code of Conduct
+- **Programas de afiliados**: Enlaces de referencia a tiendas (Eneba, Instant Gaming, Fanatical, etc.)
+- **Google AdSense**: Banners publicitarios estratégicos
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+## Contribuir
 
-## Security Vulnerabilities
+Este proyecto sigue el **BMAD Method** para desarrollo agéntico.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+1. Fork del repositorio
+2. Crear rama feature (`git checkout -b feature/nueva-funcionalidad`)
+3. Commits descriptivos siguiendo convenciones
+4. Abrir Pull Request
 
-## License
+## Licencia
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Este proyecto está licenciado bajo la [MIT License](https://opensource.org/licenses/MIT).

@@ -5,6 +5,7 @@ use App\Http\Controllers\GameController;
 use App\Http\Controllers\GenreController;
 use App\Http\Controllers\PriceAlertController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\SitemapController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -15,6 +16,7 @@ Route::get('/categoria/{genre}', [GenreController::class, 'show'])->name('genre.
 Route::get('/sitemap.xml', [SitemapController::class, 'index'])->name('sitemap');
 
 Route::post('/alerts', [PriceAlertController::class, 'store'])->name('alerts.store');
+Route::post('/juego/{game}/reviews', [ReviewController::class, 'store'])->name('reviews.store');
 
 Route::get('/dashboard', function () {
     return Inertia::render('Dashboard');

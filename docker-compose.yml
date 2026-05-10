@@ -18,12 +18,21 @@ services:
       DB_USERNAME: gameprice
       DB_PASSWORD: secret
       SESSION_DRIVER: database
-      CACHE_STORE: database
+      CACHE_STORE: redis
       QUEUE_CONNECTION: database
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
     volumes:
       - ./storage/logs:/var/www/storage/logs
     depends_on:
       - db
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
 
   db:
     image: postgres:16-alpine

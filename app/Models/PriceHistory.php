@@ -14,6 +14,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class PriceHistory extends Model
 {
+    protected $table = 'price_history';
+
     public $timestamps = false;
 
     protected function casts(): array

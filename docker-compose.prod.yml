@@ -21,8 +21,10 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       SESSION_DRIVER: database
       SESSION_SECURE_COOKIE: "true"
-      CACHE_STORE: database
+      CACHE_STORE: redis
       QUEUE_CONNECTION: database
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: 6379
       TRUSTED_PROXIES: "*"
     deploy:
       resources:
@@ -30,3 +32,7 @@ services:
           memory: 512M
         reservations:
           memory: 256M
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped

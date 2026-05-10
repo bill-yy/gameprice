@@ -2,6 +2,8 @@
 import { Head, Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import Breadcrumbs from '@/Components/Breadcrumbs.vue';
+import ReviewList from '@/Components/ReviewList.vue';
+import ReviewForm from '@/Components/ReviewForm.vue';
 
 const props = defineProps({
     game: {
@@ -15,6 +17,10 @@ const props = defineProps({
     seo: {
         type: Object,
         default: () => ({}),
+    },
+    reviews: {
+        type: Array,
+        default: () => [],
     },
 });
 
@@ -194,6 +200,11 @@ const schemaScript = computed(() => {
                 <p v-else class="rounded-lg bg-gray-800 p-8 text-center text-gray-400">
                     No hay precios disponibles para este juego.
                 </p>
+            </div>
+
+            <div class="mt-10 space-y-6">
+                <ReviewList :reviews="reviews" />
+                <ReviewForm :game-slug="game.slug" />
             </div>
         </main>
     </div>
