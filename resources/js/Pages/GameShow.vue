@@ -1,6 +1,7 @@
 <script setup>
 import { Head, Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
+import Breadcrumbs from '@/Components/Breadcrumbs.vue';
 
 const props = defineProps({
     game: {
@@ -65,12 +66,10 @@ const schemaScript = computed(() => {
         </header>
 
         <main class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-            <Link href="/" class="mb-6 inline-flex items-center gap-2 text-sm text-gray-400 hover:text-white">
-                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-                </svg>
-                Volver
-            </Link>
+            <Breadcrumbs :items="[
+                { label: 'Inicio', href: '/' },
+                { label: game.title },
+            ]" />
 
             <div class="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-3">
                 <div class="lg:col-span-1">
@@ -89,13 +88,14 @@ const schemaScript = computed(() => {
                     </p>
 
                     <div v-if="genres.length" class="mt-4 flex flex-wrap gap-2">
-                        <span
+                        <Link
                             v-for="genre in genres"
                             :key="genre"
-                            class="rounded-full bg-gray-700 px-3 py-1 text-xs text-gray-300"
+                            :href="route('genre.show', genre)"
+                            class="rounded-full bg-gray-700 px-3 py-1 text-xs text-gray-300 transition hover:bg-gray-600 hover:text-white"
                         >
                             {{ genre }}
-                        </span>
+                        </Link>
                     </div>
 
                     <p v-if="game.description" class="mt-6 leading-relaxed text-gray-300">
@@ -115,19 +115,27 @@ const schemaScript = computed(() => {
                 <h2 class="mb-4 text-2xl font-bold">Comparar precios</h2>
 
                 <div v-if="products.length > 0" class="overflow-x-auto rounded-lg border border-gray-700">
-                    <table class="w-full text-left text-sm">
+                    <table class="w-full min-w-[640px] text-left text-sm">
                         <thead class="bg-gray-800 text-xs uppercase text-gray-400">
                             <tr>
                                 <th class="px-4 py-3">Tienda</th>
                                 <th class="px-4 py-3">Plataforma</th>
                                 <th class="px-4 py-3">Regi&oacute;n</th>
-                                <th class="px-4 py-3">Precio</th>
+                                <th class="px-4 py-3">
+                                    <div class="inline-flex items-center gap-1">
+                                        Precio
+                                        <svg class="h-3 w-3 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                                        </svg>
+                                    </div>
+                                </th>
                                 <th class="px-4 py-3">Descuento</th>
+                                <th class="px-4 py-3">Ahorro</th>
                                 <th class="px-4 py-3">Acci&oacute;n</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-700">
-                            <tr v-for="product in products" :key="product.id" class="bg-gray-800 hover:bg-gray-750">
+                            <tr v-for="(product, index) in products" :key="product.id" class="bg-gray-800 hover:bg-gray-750">
                                 <td class="px-4 py-3">
                                     <div class="flex items-center gap-2">
                                         <img
@@ -137,6 +145,12 @@ const schemaScript = computed(() => {
                                             class="h-6 w-6 rounded object-contain"
                                         />
                                         <span class="font-medium">{{ product.store?.name }}</span>
+                                        <span
+                                            v-if="index === 0"
+                                            class="ml-1 rounded bg-green-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white"
+                                        >
+                                            Mejor oferta
+                                        </span>
                                     </div>
                                 </td>
                                 <td class="px-4 py-3 text-gray-300">{{ product.platform || 'Steam' }}</td>
@@ -150,6 +164,12 @@ const schemaScript = computed(() => {
                                 <td class="px-4 py-3">
                                     <span v-if="Number(product.discount_percentage) > 0" class="font-bold text-red-400">
                                         -{{ product.discount_percentage }}%
+                                    </span>
+                                    <span v-else class="text-gray-500">&mdash;</span>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <span v-if="product.original_price && Number(product.original_price) > Number(product.current_price)" class="font-semibold text-blue-400">
+                                        {{ (Number(product.original_price) - Number(product.current_price)).toFixed(2) }}&euro;
                                     </span>
                                     <span v-else class="text-gray-500">&mdash;</span>
                                 </td>

@@ -1,10 +1,14 @@
 <script setup>
 import { Link } from '@inertiajs/vue3';
 
-defineProps({
+const props = defineProps({
     game: {
         type: Object,
         required: true,
+    },
+    isBestPrice: {
+        type: Boolean,
+        default: false,
     },
 });
 
@@ -22,8 +26,24 @@ const maxDiscount = (products) => {
 <template>
     <Link
         :href="route('game.show', game.slug)"
-        class="group block overflow-hidden rounded-lg bg-gray-800 transition-all duration-200 hover:ring-2 hover:ring-blue-500"
+        class="group relative block overflow-hidden rounded-lg bg-gray-800 transition-all duration-200 hover:ring-2 hover:ring-blue-500"
     >
+        <!-- Discount badge corner -->
+        <div
+            v-if="maxDiscount(game.products) > 0"
+            class="absolute right-0 top-0 z-10 rounded-bl-lg bg-red-600 px-2 py-1 text-xs font-bold text-white shadow-md"
+        >
+            -{{ maxDiscount(game.products) }}%
+        </div>
+
+        <!-- Best price badge -->
+        <div
+            v-if="isBestPrice"
+            class="absolute left-0 top-0 z-10 rounded-br-lg bg-green-600 px-2 py-1 text-xs font-bold text-white shadow-md"
+        >
+            Mejor precio
+        </div>
+
         <img
             :src="game.cover_image"
             :alt="game.title"
@@ -41,7 +61,7 @@ const maxDiscount = (products) => {
                 <span v-else class="text-xs text-gray-500">Sin precios</span>
                 <span
                     v-if="maxDiscount(game.products) > 0"
-                    class="rounded bg-red-600 px-2 py-0.5 text-xs font-bold text-white"
+                    class="rounded bg-red-600/20 px-2 py-0.5 text-xs font-bold text-red-400"
                 >
                     -{{ maxDiscount(game.products) }}%
                 </span>

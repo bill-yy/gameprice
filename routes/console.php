@@ -10,3 +10,5 @@ Artisan::command('inspire', function () {
 
 Schedule::command('steam:update-games --limit=50')->everySixHours();
 Schedule::command('prices:update')->everySixHours();
+Schedule::command('alerts:check')->hourly();
+Schedule::command('prices:scrape-all')->everyThreeHours();

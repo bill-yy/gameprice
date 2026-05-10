@@ -8,13 +8,17 @@ import Breadcrumbs from '@/Components/Breadcrumbs.vue';
 import AppFooter from '@/Components/AppFooter.vue';
 
 const props = defineProps({
+    genre: {
+        type: String,
+        required: true,
+    },
     games: {
         type: Object,
         required: true,
     },
-    filters: {
-        type: Object,
-        default: () => ({}),
+    popularGenres: {
+        type: Array,
+        default: () => [],
     },
     seo: {
         type: Object,
@@ -45,7 +49,7 @@ const bestPriceSlug = computed(() => {
 
 <template>
     <Head>
-        <title>{{ seo.title || 'GamePrice.es' }}</title>
+        <title>{{ seo.title || `Juegos de ${genre}` }}</title>
         <meta name="description" :content="seo.description" />
         <link rel="canonical" :href="seo.canonical" />
         <meta property="og:title" :content="seo.og?.title" />
@@ -68,7 +72,15 @@ const bestPriceSlug = computed(() => {
         </header>
 
         <main class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-            <Breadcrumbs :items="[{ label: 'Inicio' }]" />
+            <Breadcrumbs :items="[
+                { label: 'Inicio', href: '/' },
+                { label: genre },
+            ]" />
+
+            <div class="mb-6">
+                <h1 class="text-3xl font-bold">Juegos de {{ genre }}</h1>
+                <p class="mt-1 text-gray-400">Los mejores precios para juegos de {{ genre }}</p>
+            </div>
 
             <div v-if="loading" class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
                 <SkeletonCard v-for="n in 8" :key="n" />
@@ -84,14 +96,14 @@ const bestPriceSlug = computed(() => {
             </div>
 
             <div v-else class="py-20 text-center">
-                <p class="text-xl text-gray-400">No se encontraron juegos</p>
+                <p class="text-xl text-gray-400">No se encontraron juegos en esta categoría</p>
             </div>
 
             <div v-if="games.last_page > 1" class="mt-8 flex justify-center gap-2">
                 <Link
                     v-for="page in games.last_page"
                     :key="page"
-                    :href="route('home', { page, search: filters.search })"
+                    :href="route('genre.show', { genre: props.genre, page })"
                     :class="[
                         'rounded-lg px-4 py-2 text-sm font-medium transition',
                         page === games.current_page
@@ -104,6 +116,6 @@ const bestPriceSlug = computed(() => {
             </div>
         </main>
 
-        <AppFooter />
+        <AppFooter :popular-genres="popularGenres" />
     </div>
 </template>
