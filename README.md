@@ -102,3 +102,4 @@ Este proyecto sigue el **BMAD Method** para desarrollo agéntico.
 ## Licencia
 
 Este proyecto está licenciado bajo la [MIT License](https://opensource.org/licenses/MIT).
+# Dokploy cache invalidation Mon May 11 13:24:50 UTC 2026
