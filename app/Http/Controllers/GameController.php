@@ -16,7 +16,7 @@ class GameController extends Controller
         $cacheKey = "games.index.page.{$page}.search." . md5($search);
 
         $games = Cache::remember($cacheKey, 3600, function () use ($request) {
-            return Game::query()
+            $paginator = Game::query()
                 ->with('products.store')
                 ->when($request->search, function ($q, $search) {
                     $driver = $q->getConnection()->getDriverName();
@@ -29,6 +29,8 @@ class GameController extends Controller
                 ->orderByDesc('metacritic_score')
                 ->paginate(24)
                 ->withQueryString();
+
+            return $paginator->toArray();
         });
 
         return Inertia::render('Home', [
@@ -92,7 +94,13 @@ class GameController extends Controller
                 ])->values()->all(),
             ];
 
-            return compact('game', 'products', 'lowestPrice', 'highestDiscount', 'schema');
+            return [
+                'game' => $game->toArray(),
+                'products' => $products->values()->toArray(),
+                'lowestPrice' => $lowestPrice,
+                'highestDiscount' => $highestDiscount,
+                'schema' => $schema,
+            ];
         });
 
         return Inertia::render('GameShow', [
