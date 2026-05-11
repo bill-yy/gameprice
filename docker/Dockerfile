@@ -51,9 +51,6 @@ COPY . .
 
 # Build de assets y optimización
 RUN composer dump-autoload --optimize \
-    && php artisan optimize \
-    && php artisan view:cache \
-    && php artisan event:cache \
     && npm run build \
     && rm -rf node_modules
 
@@ -67,6 +64,10 @@ COPY docker/nginx.conf /etc/nginx/nginx.conf
 # Supervisor para gestionar php-fpm + nginx + queue worker
 COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
+# Entrypoint que limpia el config cache del build y recachea con las env vars reales
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 EXPOSE 80
 
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
