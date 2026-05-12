@@ -69,7 +69,7 @@ class ImportEnebaJson extends Command
             $attributes = [
                 'current_price' => $price,
                 'original_price' => $originalPrice,
-                'discount_percent' => $discount,
+                'discount_percent' => $discount ?? 0,
                 'is_real_price' => true,
                 'url' => $url,
                 'affiliate_url' => $url,
