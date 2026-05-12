@@ -70,20 +70,27 @@ class ScrapeCheapShark extends Command
 
     private function fetchDeals(int $page): array
     {
+        $url = self::BASE_URL . '/deals?pageSize=60&pageNumber=' . $page;
+        $this->info("Fetching: {$url}");
+
         try {
-            $response = Http::get(self::BASE_URL . '/deals', [
-                'pageSize' => 60,
-                'pageNumber' => $page,
-                'sortBy' => 'Deal Rating',
-            ]);
+            $response = Http::timeout(30)->get($url);
+
+            $this->info("Response status: " . $response->status());
+            $this->info("Response body length: " . strlen($response->body()));
 
             if ($response->failed()) {
+                $this->warn("Request failed: " . $response->status());
                 Log::warning('CheapShark deals request failed', ['page' => $page, 'status' => $response->status()]);
                 return [];
             }
 
-            return $response->json() ?? [];
+            $json = $response->json();
+            $this->info("Decoded items: " . (is_array($json) ? count($json) : 'not array'));
+
+            return is_array($json) ? $json : [];
         } catch (\Throwable $e) {
+            $this->warn("Exception: " . $e->getMessage());
             Log::warning('CheapShark deals connection error', ['page' => $page, 'error' => $e->getMessage()]);
             return [];
         }
