@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Game;
 use App\Models\Product;
+use App\Models\Store;
 use App\Models\Voucher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -13,12 +14,11 @@ class GameController extends Controller
 {
     public function index(Request $request)
     {
-        $page = $request->input('page', 1);
         $search = $request->input('search', '');
-        $cacheKey = "games.index.page.{$page}.search." . md5($search);
+        $cacheKey = 'games.index.' . md5(json_encode($request->all()));
 
         $games = Cache::remember($cacheKey, 3600, function () use ($request) {
-            $paginator = Game::query()
+            $query = Game::query()
                 ->with('products.store')
                 ->when($request->search, function ($q, $search) {
                     $driver = $q->getConnection()->getDriverName();
@@ -27,10 +27,75 @@ class GameController extends Controller
                     } else {
                         $q->where('title', 'like', "%{$search}%");
                     }
-                })
-                ->orderByDesc('metacritic_score')
-                ->paginate(24)
-                ->withQueryString();
+                });
+
+            if ($request->filled('price_min') || $request->filled('price_max')) {
+                $query->whereHas('products', function ($q) use ($request) {
+                    $q->where('is_real_price', true);
+                    if ($request->filled('price_min')) {
+                        $q->where('current_price', '>=', $request->price_min);
+                    }
+                    if ($request->filled('price_max')) {
+                        $q->where('current_price', '<=', $request->price_max);
+                    }
+                });
+            }
+
+            if ($request->filled('discount_min')) {
+                $query->whereHas('products', function ($q) use ($request) {
+                    $q->where('is_real_price', true)
+                      ->where('discount_percent', '>=', $request->discount_min);
+                });
+            }
+
+            if ($request->filled('region')) {
+                $query->whereHas('products', function ($q) use ($request) {
+                    $q->where('region', $request->region);
+                });
+            }
+
+            if ($request->filled('store')) {
+                $storeSlugs = explode(',', $request->store);
+                $query->whereHas('products.store', function ($q) use ($storeSlugs) {
+                    $q->whereIn('slug', $storeSlugs);
+                });
+            }
+
+            $sort = $request->input('sort', '');
+            switch ($sort) {
+                case 'price_asc':
+                    $query->orderBy(
+                        Product::selectRaw('MIN(current_price)')
+                            ->whereColumn('products.game_id', 'games.id')
+                            ->where('is_real_price', true)
+                    );
+                    break;
+                case 'price_desc':
+                    $query->orderByDesc(
+                        Product::selectRaw('MIN(current_price)')
+                            ->whereColumn('products.game_id', 'games.id')
+                            ->where('is_real_price', true)
+                    );
+                    break;
+                case 'discount_desc':
+                    $query->orderByDesc(
+                        Product::selectRaw('MAX(discount_percent)')
+                            ->whereColumn('products.game_id', 'games.id')
+                            ->where('is_real_price', true)
+                    );
+                    break;
+                case 'release_desc':
+                    $query->orderByDesc('release_date');
+                    break;
+                case 'name_asc':
+                    $query->orderBy('title');
+                    break;
+                default:
+                    $query->orderByDesc('metacritic_score');
+                    break;
+            }
+
+            $paginator = $query->paginate(24)->withQueryString();
 
             return $paginator->toArray();
         });
@@ -70,12 +135,17 @@ class GameController extends Controller
             }
         }
 
+        $stores = Store::where('is_active', true)->get(['id', 'name', 'slug']);
+        $regions = Product::distinct()->pluck('region')->filter()->sort()->values();
+
         return Inertia::render('Home', [
             'games' => $games,
             'trendingGames' => $trending,
             'bestDeals' => $bestDeals,
             'newReleases' => $newReleases,
-            'filters' => $request->only('search'),
+            'stores' => $stores,
+            'regions' => $regions,
+            'filters' => $request->only(['search', 'price_min', 'price_max', 'discount_min', 'region', 'store', 'sort']),
             'seo' => [
                 'title' => 'GamePrice.es - Compara precios de videojuegos',
                 'description' => 'Encuentra los mejores precios para tus videojuegos favoritos. Compara ofertas de Eneba, Instant Gaming, Fanatical y más tiendas.',
