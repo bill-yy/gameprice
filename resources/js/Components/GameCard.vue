@@ -68,6 +68,14 @@ const formatDate = (date) => {
             Mejor precio
         </div>
 
+        <!-- Próximamente badge -->
+        <div
+            v-if="game.release_date && new Date(game.release_date) > new Date()"
+            class="absolute right-0 top-0 z-10 rounded-bl-lg bg-amber-600 px-2 py-1 text-xs font-bold text-white shadow-md"
+        >
+            Próximamente
+        </div>
+
         <img
             :src="game.cover_image"
             :alt="game.title"

@@ -274,7 +274,15 @@ const chartData = computed(() => {
                 </div>
 
                 <div class="lg:col-span-2">
-                    <h1 class="text-4xl font-bold">{{ game.title }}</h1>
+                    <div class="flex items-start gap-3">
+                        <h1 class="text-4xl font-bold">{{ game.title }}</h1>
+                        <span
+                            v-if="game.release_date && new Date(game.release_date) > new Date()"
+                            class="mt-2 rounded bg-amber-600 px-3 py-1 text-sm font-bold text-white shadow-md"
+                        >
+                            Próximamente
+                        </span>
+                    </div>
                     <p class="mt-2 text-gray-400">
                         {{ game.developer }}
                         <span v-if="game.release_date" class="ml-2">&middot; {{ formatDate(game.release_date) }}</span>

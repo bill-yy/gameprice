@@ -1,8 +1,8 @@
 <script setup>
-import { ref, computed, watch } from 'vue';
-import { Head, Link, router, usePage } from '@inertiajs/vue3';
+import { ref, computed } from 'vue';
+import { Head, Link, router } from '@inertiajs/vue3';
 import GameCard from '@/Components/GameCard.vue';
-import SearchBar from '@/Components/SearchBar.vue';
+import SearchAutocomplete from '@/Components/SearchAutocomplete.vue';
 import SkeletonCard from '@/Components/SkeletonCard.vue';
 import Breadcrumbs from '@/Components/Breadcrumbs.vue';
 import AppFooter from '@/Components/AppFooter.vue';
@@ -46,19 +46,8 @@ const props = defineProps({
     },
 });
 
-const search = ref(props.filters.search || '');
 const loading = ref(false);
 const filtersVisible = ref(false);
-const searchingOnDemand = ref(false);
-const onDemandError = ref('');
-
-const page = usePage();
-watch(() => page.props.flash?.error, (msg) => {
-    if (msg) {
-        onDemandError.value = msg;
-        searchingOnDemand.value = false;
-    }
-}, { immediate: true });
 
 const form = ref({
     price_min: props.filters.price_min || '',
@@ -93,7 +82,7 @@ const hasActiveFilters = computed(() => {
 
 function applyFilters() {
     const params = {};
-    if (search.value) params.search = search.value;
+    if (props.filters.search) params.search = props.filters.search;
     if (form.value.price_min) params.price_min = form.value.price_min;
     if (form.value.price_max) params.price_max = form.value.price_max;
     if (form.value.discount_min) params.discount_min = form.value.discount_min;
@@ -125,22 +114,6 @@ function paginationParams(page) {
     if (props.filters.sort) params.sort = props.filters.sort;
     return params;
 }
-
-function searchOnSteam() {
-    searchingOnDemand.value = true;
-    onDemandError.value = '';
-    router.post(props.onDemandSearchUrl, { query: search.value }, {
-        preserveState: true,
-        preserveScroll: true,
-        onError: (errors) => {
-            onDemandError.value = errors.query || 'No se encontró el juego en Steam';
-            searchingOnDemand.value = false;
-        },
-        onFinish: () => {
-            searchingOnDemand.value = false;
-        },
-    });
-}
 </script>
 
 <template>
@@ -156,13 +129,13 @@ function searchOnSteam() {
     </Head>
 
     <div class="min-h-screen bg-gray-900 text-white">
-        <header class="border-b border-gray-700 bg-gray-800">
+        <header class="sticky top-0 z-50 border-b border-gray-700 bg-gray-800">
             <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
                 <Link href="/" class="text-2xl font-bold text-white">
                     Game<span class="text-blue-500">Price</span><span class="text-gray-400">.es</span>
                 </Link>
                 <div class="w-full max-w-md ml-8">
-                    <SearchBar v-model="search" />
+                    <SearchAutocomplete />
                 </div>
             </div>
         </header>
@@ -170,7 +143,6 @@ function searchOnSteam() {
         <main class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
             <Breadcrumbs :items="[{ label: 'Inicio' }]" />
 
-            <!-- Hero Section -->
             <section class="py-12 text-center">
                 <h1 class="text-4xl font-extrabold tracking-tight text-white sm:text-5xl">
                     Encuentra los mejores precios de videojuegos
@@ -178,9 +150,6 @@ function searchOnSteam() {
                 <p class="mx-auto mt-4 max-w-2xl text-lg text-gray-400">
                     Compara ofertas de tiendas oficiales y grey market en segundos
                 </p>
-                <div class="mx-auto mt-8 max-w-lg">
-                    <SearchBar v-model="search" />
-                </div>
             </section>
 
             <!-- Trending Section -->
@@ -348,27 +317,9 @@ function searchOnSteam() {
 
                 <div v-else class="py-20 text-center">
                     <p class="text-xl text-gray-400">No se encontraron juegos</p>
-                    <template v-if="search">
-                        <p class="mt-2 text-sm text-gray-500">
-                            No encontramos '{{ search }}' en nuestra base de datos
-                        </p>
-                        <button
-                            v-if="!searchingOnDemand"
-                            type="button"
-                            @click="searchOnSteam"
-                            class="mt-4 inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700"
-                        >
-                            🔍 Buscar en Steam
-                        </button>
-                        <div v-else class="mt-4 flex items-center justify-center gap-2 text-sm text-gray-400">
-                            <svg class="h-5 w-5 animate-spin text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            Buscando en Steam...
-                        </div>
-                        <p v-if="onDemandError" class="mt-3 text-sm text-red-400">{{ onDemandError }}</p>
-                    </template>
+                    <p v-if="props.filters.search" class="mt-2 text-sm text-gray-500">
+                        No encontramos '{{ props.filters.search }}' en nuestra base de datos. Prueba el buscador de la cabecera.
+                    </p>
                 </div>
 
                 <div v-if="games.last_page > 1" class="mt-8 flex justify-center gap-2">

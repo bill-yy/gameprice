@@ -242,6 +242,64 @@ class GameController extends Controller
         ]);
     }
 
+    public function searchSuggestions(Request $request)
+    {
+        $query = trim($request->input('query', ''));
+
+        if (strlen($query) < 3) {
+            return response()->json(['db' => [], 'steam' => []]);
+        }
+
+        $driver = Game::query()->getConnection()->getDriverName();
+
+        $dbResults = Game::query()
+            ->when($driver === 'pgsql', fn($q) => $q->whereRaw('title ilike ?', ["%{$query}%"]))
+            ->when($driver !== 'pgsql', fn($q) => $q->where('title', 'like', "%{$query}%"))
+            ->limit(5)
+            ->get(['slug', 'title', 'cover_image', 'release_date'])
+            ->values()
+            ->toArray();
+
+        $steamResults = [];
+        $remaining = 5 - count($dbResults);
+
+        if ($remaining > 0) {
+            try {
+                $response = \Illuminate\Support\Facades\Http::timeout(5)->withHeaders([
+                    'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                ])->get('https://store.steampowered.com/api/storesearch/', [
+                    'term' => $query,
+                    'l' => 'english',
+                    'cc' => 'ES',
+                ]);
+
+                $items = $response->json('items') ?? [];
+                $dbTitles = array_map('strtolower', array_column($dbResults, 'title'));
+
+                foreach ($items as $item) {
+                    if (count($steamResults) >= $remaining) {
+                        break;
+                    }
+                    if (in_array(strtolower($item['name'] ?? ''), $dbTitles)) {
+                        continue;
+                    }
+                    $steamResults[] = [
+                        'appid' => $item['id'],
+                        'name' => $item['name'],
+                        'tiny_image' => $item['tiny_image'] ?? null,
+                    ];
+                }
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::warning('Steam suggestions failed: ' . $e->getMessage());
+            }
+        }
+
+        return response()->json([
+            'db' => $dbResults,
+            'steam' => $steamResults,
+        ]);
+    }
+
     public function searchOnDemand(Request $request)
     {
         $request->validate(['query' => 'required|string|min:2']);
