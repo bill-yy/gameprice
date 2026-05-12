@@ -140,6 +140,16 @@ class StoreSeeder extends Seeder
                 'is_official' => true,
                 'is_active' => true,
             ],
+            [
+                'name' => 'Gamivo',
+                'slug' => 'gamivo',
+                'website' => 'https://www.gamivo.com',
+                'logo_url' => 'https://www.gamivo.com/favicon.ico',
+                'affiliate_program' => null,
+                'commission_rate' => 0.00,
+                'is_official' => false,
+                'is_active' => true,
+            ],
         ];
 
         foreach ($stores as $store) {
