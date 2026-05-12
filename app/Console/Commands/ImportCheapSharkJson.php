@@ -23,7 +23,7 @@ class ImportCheapSharkJson extends Command
 
     public function handle(): int
     {
-        $path = storage_path('app/cheapshark_deals.json');
+        $path = base_path('data/cheapshark_deals.json');
 
         if (! file_exists($path)) {
             $this->error("File not found: {$path}");
