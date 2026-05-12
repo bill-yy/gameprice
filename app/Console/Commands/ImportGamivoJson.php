@@ -60,6 +60,7 @@ class ImportGamivoJson extends Command
             }
 
             $cleanTitle = $this->extractGameTitle($name);
+            $region = $this->extractRegion($name);
             $game = $this->findGame($gameTitle ?? $cleanTitle);
 
             if (!$game) {
@@ -77,7 +78,7 @@ class ImportGamivoJson extends Command
                 'in_stock' => $inStock,
                 'currency' => 'EUR',
                 'platform' => 'PC',
-                'region' => 'global',
+                'region' => $region,
                 'type' => 'key',
             ];
 
@@ -123,6 +124,33 @@ class ImportGamivoJson extends Command
         $title = preg_replace('/\s*(Steam Key|GOG Key|Xbox Live Key|PSN Key)\s*(GLOBAL|EUROPE|US|ASIA).*/i', '', $title);
         $title = trim($title);
         return $title;
+    }
+
+    private function extractRegion(string $name): string
+    {
+        $upper = strtoupper($name);
+        $map = [
+            'GLOBAL' => 'global',
+            'EUROPE' => 'EU',
+            '(EU)' => 'EU',
+            'NORTH AMERICA' => 'US',
+            '(US)' => 'US',
+            '(USA)' => 'US',
+            '(NA)' => 'US',
+            'LATAM' => 'LATAM',
+            'LATIN AMERICA' => 'LATAM',
+            'RUSSIA' => 'RU',
+            '(RU)' => 'RU',
+            'CIS' => 'CIS',
+            'ASIA' => 'ASIA',
+            'APAC' => 'ASIA',
+        ];
+        foreach ($map as $needle => $region) {
+            if (str_contains($upper, $needle)) {
+                return $region;
+            }
+        }
+        return 'global';
     }
 
     private function findGame(string $title): ?Game

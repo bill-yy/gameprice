@@ -55,16 +55,16 @@ class ImportEnebaJson extends Command
                 continue;
             }
 
-            // Extract game title from Eneba product name (remove platform/region info)
             $cleanTitle = $this->extractGameTitle($name);
 
-            // Find matching game
             $game = $this->findGame($cleanTitle);
 
             if (! $game) {
                 Log::debug("Eneba import: no game match for '{$cleanTitle}' (from '{$name}')");
                 continue;
             }
+
+            $region = $this->extractRegion($name);
 
             $attributes = [
                 'current_price' => $price,
@@ -76,7 +76,7 @@ class ImportEnebaJson extends Command
                 'in_stock' => $inStock,
                 'currency' => 'EUR',
                 'platform' => 'PC',
-                'region' => 'global',
+                'region' => $region,
                 'type' => 'key',
             ];
 
@@ -118,11 +118,37 @@ class ImportEnebaJson extends Command
 
     private function extractGameTitle(string $enebaName): string
     {
-        // Remove common suffixes like "(PC) Steam Key GLOBAL", "Steam Key EUROPE", etc.
         $title = preg_replace('/\s*\([^)]*\)\s*(Steam Key|Key)\s*(GLOBAL|EUROPE|US|ASIA).*/i', '', $enebaName);
         $title = preg_replace('/\s*(Steam Key|GOG Key|Xbox Live Key|PSN Key)\s*(GLOBAL|EUROPE|US|ASIA).*/i', '', $title);
         $title = trim($title);
         return $title;
+    }
+
+    private function extractRegion(string $name): string
+    {
+        $upper = strtoupper($name);
+        $map = [
+            'GLOBAL' => 'global',
+            'EUROPE' => 'EU',
+            '(EU)' => 'EU',
+            'NORTH AMERICA' => 'US',
+            '(US)' => 'US',
+            '(USA)' => 'US',
+            '(NA)' => 'US',
+            'LATAM' => 'LATAM',
+            'LATIN AMERICA' => 'LATAM',
+            'RUSSIA' => 'RU',
+            '(RU)' => 'RU',
+            'CIS' => 'CIS',
+            'ASIA' => 'ASIA',
+            'APAC' => 'ASIA',
+        ];
+        foreach ($map as $needle => $region) {
+            if (str_contains($upper, $needle)) {
+                return $region;
+            }
+        }
+        return 'global';
     }
 
     private function findGame(string $title): ?Game

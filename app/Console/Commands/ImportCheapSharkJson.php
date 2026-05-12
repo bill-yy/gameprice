@@ -166,7 +166,7 @@ class ImportCheapSharkJson extends Command
             'in_stock' => true,
             'currency' => 'EUR',
             'platform' => 'PC',
-            'region' => 'global',
+            'region' => $this->extractRegion($title),
             'type' => 'key',
         ];
 
@@ -195,5 +195,32 @@ class ImportCheapSharkJson extends Command
         }
 
         return $result;
+    }
+
+    private function extractRegion(string $name): string
+    {
+        $upper = strtoupper($name);
+        $map = [
+            'GLOBAL' => 'global',
+            'EUROPE' => 'EU',
+            '(EU)' => 'EU',
+            'NORTH AMERICA' => 'US',
+            '(US)' => 'US',
+            '(USA)' => 'US',
+            '(NA)' => 'US',
+            'LATAM' => 'LATAM',
+            'LATIN AMERICA' => 'LATAM',
+            'RUSSIA' => 'RU',
+            '(RU)' => 'RU',
+            'CIS' => 'CIS',
+            'ASIA' => 'ASIA',
+            'APAC' => 'ASIA',
+        ];
+        foreach ($map as $needle => $region) {
+            if (str_contains($upper, $needle)) {
+                return $region;
+            }
+        }
+        return 'global';
     }
 }

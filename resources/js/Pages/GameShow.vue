@@ -28,6 +28,17 @@ const props = defineProps({
     },
 });
 
+const regionBadge = (region) => {
+    const r = (region || '').trim().toLowerCase();
+    if (!r || r === 'global') return { emoji: '🌍', label: 'Global', cls: 'bg-green-600/30 text-green-300' };
+    if (['eu', 'europe'].includes(r)) return { emoji: '🇪🇺', label: 'Europa', cls: 'bg-blue-600/30 text-blue-300' };
+    if (['us', 'usa', 'na', 'north america'].includes(r)) return { emoji: '🇺🇸', label: 'Norteamérica', cls: 'bg-blue-600/30 text-blue-300' };
+    if (['latam', 'latin america'].includes(r)) return { emoji: '🌎', label: 'LATAM', cls: 'bg-yellow-600/30 text-yellow-300' };
+    if (['ru', 'russia', 'cis'].includes(r)) return { emoji: '🇷🇺', label: 'Rusia/CIS', cls: 'bg-red-600/30 text-red-300' };
+    if (['asia', 'apac'].includes(r)) return { emoji: '🌏', label: 'Asia', cls: 'bg-purple-600/30 text-purple-300' };
+    return { emoji: null, label: region, cls: 'bg-gray-600/30 text-gray-300' };
+};
+
 const formatDate = (date) => {
     if (!date) return '';
     return new Date(date).toLocaleDateString('es-ES', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -321,7 +332,15 @@ const chartData = computed(() => {
                                     </div>
                                 </td>
                                 <td class="px-4 py-3 text-gray-300">{{ product.platform || 'Steam' }}</td>
-                                <td class="px-4 py-3 text-gray-300">{{ product.region || 'Global' }}</td>
+                                <td class="px-4 py-3">
+                                    <span
+                                        class="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium"
+                                        :class="regionBadge(product.region).cls"
+                                    >
+                                        <span v-if="regionBadge(product.region).emoji">{{ regionBadge(product.region).emoji }}</span>
+                                        {{ regionBadge(product.region).label }}
+                                    </span>
+                                </td>
                                 <td class="px-4 py-3">
                                     <span class="font-bold text-green-400">{{ Number(product.current_price).toFixed(2) }}&euro;</span>
                                     <span v-if="product.original_price && Number(product.original_price) > Number(product.current_price)" class="ml-2 text-xs text-gray-500 line-through">

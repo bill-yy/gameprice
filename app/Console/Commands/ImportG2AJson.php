@@ -68,6 +68,10 @@ class ImportG2AJson extends Command
                 continue;
             }
 
+            if ($region === 'global') {
+                $region = $this->extractRegion($name);
+            }
+
             $attributes = [
                 'current_price' => $price,
                 'original_price' => $originalPrice,
@@ -124,6 +128,33 @@ class ImportG2AJson extends Command
         $title = preg_replace('/\s*(Steam Key|GOG Key|Xbox Live Key|PSN Key)\s*(GLOBAL|EUROPE|US|ASIA).*/i', '', $title);
         $title = preg_replace('/\s*-\s*(Steam|GOG|Epic Games)\s*(Key|Account|Gift).*/i', '', $title);
         return trim($title);
+    }
+
+    private function extractRegion(string $name): string
+    {
+        $upper = strtoupper($name);
+        $map = [
+            'GLOBAL' => 'global',
+            'EUROPE' => 'EU',
+            '(EU)' => 'EU',
+            'NORTH AMERICA' => 'US',
+            '(US)' => 'US',
+            '(USA)' => 'US',
+            '(NA)' => 'US',
+            'LATAM' => 'LATAM',
+            'LATIN AMERICA' => 'LATAM',
+            'RUSSIA' => 'RU',
+            '(RU)' => 'RU',
+            'CIS' => 'CIS',
+            'ASIA' => 'ASIA',
+            'APAC' => 'ASIA',
+        ];
+        foreach ($map as $needle => $region) {
+            if (str_contains($upper, $needle)) {
+                return $region;
+            }
+        }
+        return 'global';
     }
 
     private function findGame(string $title): ?Game
