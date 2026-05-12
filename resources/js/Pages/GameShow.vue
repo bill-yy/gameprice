@@ -283,9 +283,21 @@ const chartData = computed(() => {
                                             v-if="product.store?.logo_url"
                                             :src="product.store.logo_url"
                                             :alt="product.store.name"
-                                            class="h-6 w-6 rounded object-contain"
+                                            class="h-5 w-5 rounded object-contain"
                                         />
                                         <span class="font-medium">{{ product.store?.name }}</span>
+                                        <span
+                                            v-if="product.store?.is_official"
+                                            class="ml-1 rounded bg-green-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white"
+                                        >
+                                            Oficial
+                                        </span>
+                                        <span
+                                            v-else
+                                            class="ml-1 rounded bg-orange-500 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white"
+                                        >
+                                            Key Reseller
+                                        </span>
                                         <span
                                             v-if="index === 0"
                                             class="ml-1 rounded bg-green-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white"
