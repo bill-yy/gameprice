@@ -330,7 +330,7 @@ const chartData = computed(() => {
             <div class="mt-10">
                 <h2 class="mb-4 text-2xl font-bold">Comparar precios</h2>
 
-                <div v-if="products.length > 0 && products.some(p => p.is_real_price)" class="overflow-x-auto rounded-lg border border-gray-700">
+                <div v-if="products.some(p => p.is_real_price)" class="overflow-x-auto rounded-lg border border-gray-700">
                     <table class="w-full min-w-[640px] text-left text-sm">
                         <thead class="bg-gray-800 text-xs uppercase text-gray-400">
                             <tr>
@@ -449,9 +449,8 @@ const chartData = computed(() => {
                 </div>
 
                 <p v-else class="rounded-lg bg-gray-800 p-8 text-center text-gray-400">
-                    No hay precios disponibles para este juego.
+                    {{ products.length > 0 ? 'No hay precios reales disponibles para este juego.' : 'No hay precios disponibles para este juego.' }}
                     <button
-                        v-if="products.length === 0"
                         @click="refreshPrices"
                         :disabled="refreshing"
                         class="mt-4 inline-block rounded-lg bg-blue-600 px-6 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
