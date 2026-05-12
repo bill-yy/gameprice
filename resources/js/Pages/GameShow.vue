@@ -101,6 +101,19 @@ const submitAlert = () => {
     });
 };
 
+const formatReviewCount = (count) => {
+    if (!count) return '';
+    if (count >= 1000000) return (count / 1000000).toFixed(count % 1000000 === 0 ? 0 : 1) + 'M';
+    if (count >= 1000) return Math.round(count / 1000) + 'K';
+    return count.toString();
+};
+
+const storeStars = (rating) => {
+    if (!rating) return '';
+    const full = Math.round(rating);
+    return '★'.repeat(full) + '☆'.repeat(5 - full);
+};
+
 const copiedCode = ref('');
 
 const getStoreVoucher = (storeId) => {
@@ -324,39 +337,46 @@ const chartData = computed(() => {
                                             :alt="product.store.name"
                                             class="h-5 w-5 rounded object-contain"
                                         />
-                                        <span class="font-medium">{{ product.store?.name }}</span>
-                                        <span
-                                            v-if="product.store?.is_official"
-                                            class="ml-1 rounded bg-green-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white"
-                                        >
-                                            Oficial
-                                        </span>
-                                        <span
-                                            v-else
-                                            class="ml-1 rounded bg-orange-500 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white"
-                                        >
-                                            Key Reseller
-                                        </span>
-                                        <span
-                                            v-if="index === 0"
-                                            class="ml-1 rounded bg-green-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white"
-                                        >
-                                            Mejor oferta
-                                        </span>
-                                        <span
-                                            v-if="product.is_real_price"
-                                            class="ml-1 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white"
-                                            title="Precio verificado de tienda oficial"
-                                        >
-                                            Precio real
-                                        </span>
-                                        <span
-                                            v-else
-                                            class="ml-1 rounded bg-gray-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white"
-                                            title="Precio estimado, puede no ser exacto"
-                                        >
-                                            Estimado
-                                        </span>
+                                        <div class="flex flex-col">
+                                            <div class="flex items-center gap-1">
+                                                <span class="font-medium">{{ product.store?.name }}</span>
+                                                <span
+                                                    v-if="product.store?.is_official"
+                                                    class="ml-1 rounded bg-green-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white"
+                                                >
+                                                    Oficial
+                                                </span>
+                                                <span
+                                                    v-else
+                                                    class="ml-1 rounded bg-orange-500 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white"
+                                                >
+                                                    Key Reseller
+                                                </span>
+                                                <span
+                                                    v-if="index === 0"
+                                                    class="ml-1 rounded bg-green-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white"
+                                                >
+                                                    Mejor oferta
+                                                </span>
+                                                <span
+                                                    v-if="product.is_real_price"
+                                                    class="ml-1 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white"
+                                                    title="Precio verificado de tienda oficial"
+                                                >
+                                                    Precio real
+                                                </span>
+                                                <span
+                                                    v-else
+                                                    class="ml-1 rounded bg-gray-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white"
+                                                    title="Precio estimado, puede no ser exacto"
+                                                >
+                                                    Estimado
+                                                </span>
+                                            </div>
+                                            <span v-if="product.store?.rating" class="text-xs text-yellow-400">
+                                                {{ storeStars(product.store.rating) }} <span class="text-gray-400">({{ product.store.rating }} · {{ formatReviewCount(product.store.review_count) }} reseñas)</span>
+                                            </span>
+                                        </div>
                                     </div>
                                 </td>
                                 <td class="px-4 py-3 text-gray-300">{{ product.platform || 'Steam' }}</td>

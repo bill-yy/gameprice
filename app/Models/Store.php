@@ -16,6 +16,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'commission_rate',
     'is_official',
     'is_active',
+    'rating',
+    'review_count',
 ])]
 class Store extends Model
 {

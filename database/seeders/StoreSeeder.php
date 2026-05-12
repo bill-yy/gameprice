@@ -168,5 +168,29 @@ class StoreSeeder extends Seeder
                 $store
             );
         }
+
+        $ratings = [
+            'steam' => ['rating' => 4.5, 'review_count' => 1000000],
+            'gog' => ['rating' => 4.7, 'review_count' => 500000],
+            'epic-games-store' => ['rating' => 3.8, 'review_count' => 800000],
+            'humble-bundle' => ['rating' => 4.6, 'review_count' => 400000],
+            'fanatical' => ['rating' => 4.4, 'review_count' => 300000],
+            'gamesplanet' => ['rating' => 4.5, 'review_count' => 200000],
+            'green-man-gaming' => ['rating' => 4.3, 'review_count' => 250000],
+            'eneba' => ['rating' => 4.0, 'review_count' => 100000],
+            'g2a' => ['rating' => 3.5, 'review_count' => 200000],
+            'gamivo' => ['rating' => 3.8, 'review_count' => 50000],
+            'kinguin' => ['rating' => 3.6, 'review_count' => 80000],
+            'instant-gaming' => ['rating' => 4.2, 'review_count' => 120000],
+        ];
+
+        foreach ($ratings as $slug => $data) {
+            Store::where('slug', $slug)->update($data);
+        }
+
+        Store::whereNotIn('slug', array_keys($ratings))->update([
+            'rating' => 4.0,
+            'review_count' => 10000,
+        ]);
     }
 }
