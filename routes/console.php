@@ -9,7 +9,7 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('steam:update-games --limit=50')->everySixHours();
-Schedule::command('prices:update')->everySixHours();
+Schedule::command('prices:scrape-all')->everySixHours();
 Schedule::command('alerts:check')->hourly();
-Schedule::command('prices:scrape-all')->everyThreeHours();
-Schedule::command('prices:scrape-cheapshark --pages=50')->everyThreeHours();
+Schedule::command('prices:import-cheapshark-json')->dailyAt('03:00');
+// Schedule::command('prices:scrape-cheapshark --pages=10')->everyThreeHours(); // disabled: rate-limited from container

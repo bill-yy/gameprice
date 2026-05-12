@@ -72,6 +72,12 @@ class ScrapeAllPrices extends Command
                         ->where('store_id', $store->id)
                         ->first();
 
+                    // Skip if this product already has a real price from CheapShark
+                    if ($product && $product->is_real_price) {
+                        $bar->advance();
+                        continue;
+                    }
+
                     $attributes = [
                         'current_price' => $data['current_price'],
                         'original_price' => $data['original_price'],
