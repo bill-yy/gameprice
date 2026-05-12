@@ -5,19 +5,15 @@ namespace App\Console\Commands;
 use App\Models\Game;
 use App\Models\Product;
 use App\Models\Store;
-use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
+use Illuminate\Console\Command;
+use Illuminate\Support\Str;
 
-class ScrapeCheapShark extends Command
+class ImportCheapSharkJson extends Command
 {
-    protected $signature = 'prices:scrape-cheapshark {--pages=50 : Number of pages to fetch}';
+    protected $signature = 'prices:import-cheapshark-json';
 
-    protected $description = 'Scrape real prices from CheapShark API';
-
-    private const string BASE_URL = 'https://www.cheapshark.com/api/1.0';
+    protected $description = 'Import CheapShark deals from storage/app/cheapshark_deals.json';
 
     private array $storeMap = [
         '3'  => 'green-man-gaming',
@@ -27,92 +23,51 @@ class ScrapeCheapShark extends Command
 
     public function handle(): int
     {
-        $maxPages = (int) $this->option('pages');
-        $this->info("Fetching up to {$maxPages} pages from CheapShark...");
+        $path = storage_path('app/cheapshark_deals.json');
+
+        if (! file_exists($path)) {
+            $this->error("File not found: {$path}");
+
+            return self::FAILURE;
+        }
+
+        $json = file_get_contents($path);
+        $deals = json_decode($json, true);
+
+        if (! is_array($deals)) {
+            $this->error('Invalid JSON');
+
+            return self::FAILURE;
+        }
+
+        $this->info('Importing ' . count($deals) . ' deals...');
+
+        $stores = Store::whereIn('slug', array_values($this->storeMap))
+            ->get()
+            ->keyBy('slug');
 
         $createdGames = 0;
         $updatedGames = 0;
         $createdProducts = 0;
         $updatedProducts = 0;
 
-        // Preload stores
-        $stores = Store::whereIn('slug', array_values($this->storeMap))
-            ->get()
-            ->keyBy('slug');
+        $bar = $this->output->createProgressBar(count($deals));
+        $bar->start();
 
-        for ($page = 0; $page < $maxPages; $page++) {
-            $deals = $this->fetchDeals($page);
-
-            if (empty($deals)) {
-                $this->info("No more deals at page {$page}. Stopping.");
-                break;
-            }
-
-            $this->info("Page {$page}: " . count($deals) . ' deals');
-
-            foreach ($deals as $deal) {
-                $result = $this->processDeal($deal, $stores);
-                if ($result['game_created']) $createdGames++;
-                if ($result['game_updated']) $updatedGames++;
-                if ($result['product_created']) $createdProducts++;
-                if ($result['product_updated']) $updatedProducts++;
-            }
+        foreach ($deals as $deal) {
+            $result = $this->processDeal($deal, $stores);
+            if ($result['game_created']) $createdGames++;
+            if ($result['game_updated']) $updatedGames++;
+            if ($result['product_created']) $createdProducts++;
+            if ($result['product_updated']) $updatedProducts++;
+            $bar->advance();
         }
 
+        $bar->finish();
         $this->newLine();
         $this->info("Done! Games: +{$createdGames} created, {$updatedGames} updated. Products: +{$createdProducts} created, {$updatedProducts} updated.");
 
-        Cache::flush();
-        $this->info('Cache flushed.');
-
         return self::SUCCESS;
-    }
-
-    private function fetchDeals(int $page, int $retries = 3): array
-    {
-        $url = self::BASE_URL . '/deals?pageSize=60&pageNumber=' . $page;
-        $this->info("Fetching: {$url}");
-
-        for ($attempt = 1; $attempt <= $retries; $attempt++) {
-            try {
-                $response = Http::timeout(30)
-                    ->withHeaders([
-                        'User-Agent' => 'GamePriceBot/1.0 (contact@gameprice.es)',
-                        'Accept' => 'application/json',
-                    ])
-                    ->get($url);
-
-                $this->info("Response status: " . $response->status());
-                $this->info("Response body length: " . strlen($response->body()));
-
-                if ($response->status() === 429) {
-                    $wait = $attempt * 5;
-                    $this->warn("Rate limited (429). Waiting {$wait}s before retry {$attempt}/{$retries}...");
-                    sleep($wait);
-                    continue;
-                }
-
-                if ($response->failed()) {
-                    $this->warn("Request failed: " . $response->status());
-                    Log::warning('CheapShark deals request failed', ['page' => $page, 'status' => $response->status()]);
-                    return [];
-                }
-
-                $json = $response->json();
-                $this->info("Decoded items: " . (is_array($json) ? count($json) : 'not array'));
-
-                return is_array($json) ? $json : [];
-            } catch (\Throwable $e) {
-                $this->warn("Exception (attempt {$attempt}): " . $e->getMessage());
-                if ($attempt === $retries) {
-                    Log::warning('CheapShark deals connection error', ['page' => $page, 'error' => $e->getMessage()]);
-                    return [];
-                }
-                sleep($attempt * 3);
-            }
-        }
-
-        return [];
     }
 
     private function processDeal(array $deal, $stores): array
@@ -129,7 +84,6 @@ class ScrapeCheapShark extends Command
         $title = $deal['title'] ?? null;
         $salePrice = isset($deal['salePrice']) ? (float) $deal['salePrice'] : null;
         $normalPrice = isset($deal['normalPrice']) ? (float) $deal['normalPrice'] : null;
-        $savings = isset($deal['savings']) ? (float) $deal['savings'] : 0;
 
         if (! $steamAppId || ! isset($this->storeMap[$storeId]) || ! $title || ! $salePrice) {
             return $result;
@@ -142,7 +96,6 @@ class ScrapeCheapShark extends Command
             return $result;
         }
 
-        // Find or create game
         $game = Game::where('steam_app_id', $steamAppId)->first();
 
         if (! $game) {
@@ -155,9 +108,8 @@ class ScrapeCheapShark extends Command
                 }
             }
 
-            $slug = \Illuminate\Support\Str::slug($title);
-            $existingSlug = Game::where('slug', $slug)->first();
-            if ($existingSlug) {
+            $slug = Str::slug($title);
+            if (Game::where('slug', $slug)->exists()) {
                 $slug .= '-' . $steamAppId;
             }
 
@@ -177,7 +129,6 @@ class ScrapeCheapShark extends Command
             ]);
             $result['game_created'] = true;
         } else {
-            // Update cover image if missing
             if (! $game->cover_image) {
                 $game->cover_image = "https://cdn.cloudflare.steamstatic.com/steam/apps/{$steamAppId}/header.jpg";
                 $game->save();
@@ -185,10 +136,9 @@ class ScrapeCheapShark extends Command
             }
         }
 
-        // Create or update product
         $discountPercent = $normalPrice > 0
             ? (int) round((1 - ($salePrice / $normalPrice)) * 100)
-            : (int) round($savings);
+            : 0;
 
         $product = Product::where('game_id', $game->id)
             ->where('store_id', $store->id)
