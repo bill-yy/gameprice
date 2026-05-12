@@ -5,11 +5,14 @@ namespace App\Jobs;
 use App\Models\Game;
 use App\Models\Product;
 use App\Models\Store;
+use App\Services\Scrapers\CDKeysScraper;
 use App\Services\Scrapers\CheapSharkScraper;
 use App\Services\Scrapers\EnebaScraper;
 use App\Services\Scrapers\G2AScraper;
 use App\Services\Scrapers\InstantGamingScraper;
 use App\Services\Scrapers\KinguinScraper;
+use App\Services\Scrapers\PSNStoreScraper;
+use App\Services\Scrapers\XboxStoreScraper;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -31,6 +34,20 @@ class FetchPricesForGame implements ShouldQueue
             'cheapshark' => CheapSharkScraper::class,
             'g2a' => G2AScraper::class,
             'kinguin' => KinguinScraper::class,
+            'cdkeys' => CDKeysScraper::class,
+            'psn-store' => PSNStoreScraper::class,
+            'xbox-store' => XboxStoreScraper::class,
+        ];
+
+        $storeNames = [
+            'eneba' => 'Eneba',
+            'instant-gaming' => 'Instant Gaming',
+            'cheapshark' => 'CheapShark',
+            'g2a' => 'G2A',
+            'kinguin' => 'Kinguin',
+            'cdkeys' => 'CDKeys',
+            'psn-store' => 'PlayStation Store',
+            'xbox-store' => 'Xbox Store',
         ];
 
         foreach ($scrapers as $slug => $scraperClass) {
@@ -41,11 +58,17 @@ class FetchPricesForGame implements ShouldQueue
                 if ($result !== null) {
                     $store = Store::firstOrCreate(
                         ['slug' => $slug],
-                        ['name' => ucfirst($slug), 'is_active' => true],
+                        [
+                            'name' => $storeNames[$slug] ?? ucfirst(str_replace('-', ' ', $slug)),
+                            'is_active' => true,
+                        ],
                     );
 
+                    $platform = $result['platform'] ?? 'PC';
+                    $type = in_array($platform, ['PS5', 'PS4', 'Xbox Series X|S', 'Xbox One', 'Nintendo Switch']) ? 'digital' : 'key';
+
                     Product::updateOrCreate(
-                        ['game_id' => $this->game->id, 'store_id' => $store->id],
+                        ['game_id' => $this->game->id, 'store_id' => $store->id, 'platform' => $platform],
                         [
                             'current_price' => $result['price_eur'],
                             'original_price' => $result['original_price_eur'],
@@ -54,9 +77,9 @@ class FetchPricesForGame implements ShouldQueue
                             'affiliate_url' => $result['url'],
                             'is_real_price' => true,
                             'currency' => 'EUR',
-                            'platform' => 'PC',
+                            'platform' => $platform,
                             'region' => $result['region'] ?? 'global',
-                            'type' => 'key',
+                            'type' => $type,
                             'in_stock' => $result['in_stock'] ?? true,
                         ],
                     );
