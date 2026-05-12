@@ -1,5 +1,5 @@
 <script setup>
-import { Head, Link } from '@inertiajs/vue3';
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import Breadcrumbs from '@/Components/Breadcrumbs.vue';
 import ReviewList from '@/Components/ReviewList.vue';
@@ -57,6 +57,34 @@ const chartColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec
 const hasPriceHistory = computed(() => {
     return Object.values(props.priceHistories || {}).some(arr => arr && arr.length > 0);
 });
+
+const lowestRealPrice = computed(() => {
+    const realProducts = props.products.filter(p => p.is_real_price);
+    if (realProducts.length === 0) return null;
+    return Math.min(...realProducts.map(p => Number(p.current_price)));
+});
+
+const suggestedTargetPrice = computed(() => {
+    if (lowestRealPrice.value === null) return '';
+    return (lowestRealPrice.value * 0.9).toFixed(2);
+});
+
+const page = usePage();
+
+const alertForm = useForm({
+    game_id: props.game.id,
+    email: '',
+    target_price: '',
+});
+
+const submitAlert = () => {
+    alertForm.target_price = Number(alertForm.target_price);
+    alertForm.post(route('alerts.store'), {
+        onSuccess: () => {
+            alertForm.reset('email', 'target_price');
+        },
+    });
+};
 
 const chartData = computed(() => {
     if (!hasPriceHistory.value) return null;
@@ -353,6 +381,62 @@ const chartData = computed(() => {
                 <p v-else class="rounded-lg bg-gray-800 p-8 text-center text-gray-400">
                     No hay datos hist\u00f3ricos disponibles
                 </p>
+            </div>
+
+            <div class="mt-10">
+                <h2 class="mb-4 text-2xl font-bold">&#x1F514; Alertas de precio</h2>
+
+                <div class="rounded-lg border border-gray-700 bg-gray-800 p-6">
+                    <div v-if="page.props.flash?.success" class="mb-4 rounded-lg bg-green-900/50 border border-green-700 p-3 text-sm text-green-300">
+                        {{ page.props.flash.success }}
+                    </div>
+                    <div v-if="page.props.flash?.error" class="mb-4 rounded-lg bg-red-900/50 border border-red-700 p-3 text-sm text-red-300">
+                        {{ page.props.flash.error }}
+                    </div>
+
+                    <form v-if="lowestRealPrice !== null" @submit.prevent="submitAlert" class="space-y-4">
+                        <p v-if="lowestRealPrice !== null" class="text-sm text-gray-400">
+                            Precio actual: <span class="font-bold text-green-400">{{ lowestRealPrice.toFixed(2) }}&euro;</span>
+                        </p>
+
+                        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div>
+                                <label class="mb-1 block text-sm text-gray-400">Email</label>
+                                <input
+                                    v-model="alertForm.email"
+                                    type="email"
+                                    required
+                                    class="w-full rounded-lg border border-gray-600 bg-gray-700 px-3 py-2 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
+                                    placeholder="tu@email.com"
+                                />
+                                <p v-if="alertForm.errors.email" class="mt-1 text-sm text-red-400">{{ alertForm.errors.email }}</p>
+                            </div>
+                            <div>
+                                <label class="mb-1 block text-sm text-gray-400">Precio objetivo (&euro;)</label>
+                                <input
+                                    v-model="alertForm.target_price"
+                                    type="number"
+                                    step="0.01"
+                                    min="0.01"
+                                    required
+                                    class="w-full rounded-lg border border-gray-600 bg-gray-700 px-3 py-2 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
+                                    :placeholder="suggestedTargetPrice"
+                                />
+                                <p v-if="alertForm.errors.target_price" class="mt-1 text-sm text-red-400">{{ alertForm.errors.target_price }}</p>
+                            </div>
+                        </div>
+
+                        <button
+                            type="submit"
+                            :disabled="alertForm.processing"
+                            class="rounded-lg bg-blue-600 px-6 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
+                        >
+                            Crear alerta
+                        </button>
+                    </form>
+
+                    <p v-else class="text-gray-400">No hay precios disponibles para crear una alerta.</p>
+                </div>
             </div>
 
             <div class="mt-10 space-y-6">
