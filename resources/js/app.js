@@ -25,4 +25,4 @@ createInertiaApp({
         color: '#4B5563',
     },
 });
-// cache-bust 1778598224
+// cache-bust 1778598225
