@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
 Route::get('/', [GameController::class, 'index'])->name('home');
+Route::post('/search/steam', [GameController::class, 'searchOnDemand'])->name('search.steam');
 Route::get('/juego/{game}', [GameController::class, 'show'])->name('game.show');
 Route::get('/categoria/{genre}', [GenreController::class, 'show'])->name('genre.show');
 Route::get('/sitemap.xml', [SitemapController::class, 'index'])->name('sitemap');

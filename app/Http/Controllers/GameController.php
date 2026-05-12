@@ -6,6 +6,7 @@ use App\Models\Game;
 use App\Models\Product;
 use App\Models\Store;
 use App\Models\Voucher;
+use App\Services\OnDemandSearchService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
@@ -126,15 +127,6 @@ class GameController extends Controller
             ->limit(8)
             ->get();
 
-        if ($search && count($games['data'] ?? []) === 0) {
-            $onDemand = app(\App\Services\OnDemandSearchService::class);
-            $found = $onDemand->search($search);
-
-            if ($found) {
-                return redirect()->route('game.show', $found->slug);
-            }
-        }
-
         $stores = Store::where('is_active', true)->get(['id', 'name', 'slug']);
         $regions = Product::distinct()->pluck('region')->filter()->sort()->values();
 
@@ -146,6 +138,7 @@ class GameController extends Controller
             'stores' => $stores,
             'regions' => $regions,
             'filters' => $request->only(['search', 'price_min', 'price_max', 'discount_min', 'region', 'store', 'sort']),
+            'onDemandSearchUrl' => route('search.steam'),
             'seo' => [
                 'title' => 'GamePrice.es - Compara precios de videojuegos',
                 'description' => 'Encuentra los mejores precios para tus videojuegos favoritos. Compara ofertas de Eneba, Instant Gaming, Fanatical y más tiendas.',
@@ -247,5 +240,19 @@ class GameController extends Controller
                 ],
             ],
         ]);
+    }
+
+    public function searchOnDemand(Request $request)
+    {
+        $request->validate(['query' => 'required|string|min:2']);
+
+        $onDemand = app(OnDemandSearchService::class);
+        $found = $onDemand->search($request->input('query'));
+
+        if ($found) {
+            return redirect()->route('game.show', $found->slug);
+        }
+
+        return back()->with('error', 'No se encontró el juego en Steam');
     }
 }
