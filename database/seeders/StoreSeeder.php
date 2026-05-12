@@ -34,7 +34,7 @@ class StoreSeeder extends Seeder
                 'name' => 'Kinguin',
                 'slug' => 'kinguin',
                 'website' => 'https://www.kinguin.net',
-                'logo_url' => null,
+                'logo_url' => 'https://www.kinguin.net/favicon.ico',
                 'affiliate_program' => 'kinguin',
                 'commission_rate' => 5.00,
                 'is_official' => false,
