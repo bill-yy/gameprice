@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Game;
+use App\Jobs\FetchPricesForGame;
 use App\Services\Steam\SteamStoreService;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -33,6 +34,7 @@ class OnDemandSearchService
         ]);
 
         dispatch(new \App\Jobs\FetchSteamGameDetails($game));
+        dispatch(new FetchPricesForGame($game));
 
         return $game;
     }
