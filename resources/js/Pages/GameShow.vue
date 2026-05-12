@@ -157,6 +157,20 @@ const schemaScript = computed(() => {
                                         >
                                             Mejor oferta
                                         </span>
+                                        <span
+                                            v-if="product.is_real_price"
+                                            class="ml-1 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white"
+                                            title="Precio verificado de tienda oficial"
+                                        >
+                                            Precio real
+                                        </span>
+                                        <span
+                                            v-else
+                                            class="ml-1 rounded bg-gray-600 px-1.5 py-0.5 text-[10px] font-bold uppercase text-white"
+                                            title="Precio estimado, puede no ser exacto"
+                                        >
+                                            Estimado
+                                        </span>
                                     </div>
                                 </td>
                                 <td class="px-4 py-3 text-gray-300">{{ product.platform || 'Steam' }}</td>

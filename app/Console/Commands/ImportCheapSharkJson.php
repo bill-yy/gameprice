@@ -16,9 +16,21 @@ class ImportCheapSharkJson extends Command
     protected $description = 'Import CheapShark deals from storage/app/cheapshark_deals.json';
 
     private array $storeMap = [
+        '1'  => 'steam',
+        '2'  => 'gamersgate',
         '3'  => 'green-man-gaming',
+        '7'  => 'gog',
         '11' => 'humble-bundle',
+        '13' => 'uplay',
         '15' => 'fanatical',
+        '21' => 'wingamestore',
+        '23' => 'gamebillet',
+        '25' => 'epic-games-store',
+        '27' => 'gamesplanet',
+        '28' => 'gamesload',
+        '29' => '2game',
+        '30' => 'indiegala',
+        '35' => 'dreamgame',
     ];
 
     public function handle(): int
@@ -148,6 +160,7 @@ class ImportCheapSharkJson extends Command
             'current_price' => $salePrice,
             'original_price' => $normalPrice,
             'discount_percent' => $discountPercent,
+            'is_real_price' => true,
             'url' => "https://www.cheapshark.com/redirect?dealID={$deal['dealID']}",
             'affiliate_url' => "https://www.cheapshark.com/redirect?dealID={$deal['dealID']}",
             'in_stock' => true,

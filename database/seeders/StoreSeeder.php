@@ -70,10 +70,83 @@ class StoreSeeder extends Seeder
                 'is_official' => true,
                 'is_active' => true,
             ],
+            [
+                'name' => 'GOG',
+                'slug' => 'gog',
+                'website' => 'https://www.gog.com',
+                'logo_url' => null,
+                'affiliate_program' => 'gog',
+                'commission_rate' => 5.00,
+                'is_official' => true,
+                'is_active' => true,
+            ],
+            [
+                'name' => 'Epic Games Store',
+                'slug' => 'epic-games-store',
+                'website' => 'https://store.epicgames.com',
+                'logo_url' => null,
+                'affiliate_program' => 'epic',
+                'commission_rate' => 5.00,
+                'is_official' => true,
+                'is_active' => true,
+            ],
+            [
+                'name' => 'Gamesplanet',
+                'slug' => 'gamesplanet',
+                'website' => 'https://www.gamesplanet.com',
+                'logo_url' => null,
+                'affiliate_program' => 'gamesplanet',
+                'commission_rate' => 5.00,
+                'is_official' => true,
+                'is_active' => true,
+            ],
+            [
+                'name' => '2Game',
+                'slug' => '2game',
+                'website' => 'https://www.2game.com',
+                'logo_url' => null,
+                'affiliate_program' => '2game',
+                'commission_rate' => 5.00,
+                'is_official' => true,
+                'is_active' => true,
+            ],
+            [
+                'name' => 'WinGameStore',
+                'slug' => 'wingamestore',
+                'website' => 'https://www.wingamestore.com',
+                'logo_url' => null,
+                'affiliate_program' => 'wingamestore',
+                'commission_rate' => 5.00,
+                'is_official' => true,
+                'is_active' => true,
+            ],
+            [
+                'name' => 'GameBillet',
+                'slug' => 'gamebillet',
+                'website' => 'https://www.gamebillet.com',
+                'logo_url' => null,
+                'affiliate_program' => 'gamebillet',
+                'commission_rate' => 5.00,
+                'is_official' => true,
+                'is_active' => true,
+            ],
+            [
+                'name' => 'Steam',
+                'slug' => 'steam',
+                'website' => 'https://store.steampowered.com',
+                'logo_url' => null,
+                'affiliate_program' => 'steam',
+                'commission_rate' => 0.00,
+                'is_official' => true,
+                'is_active' => true,
+            ],
         ];
 
         foreach ($stores as $store) {
-            Store::create($store);
+            Store::updateOrCreate(
+                ['slug' => $store['slug']],
+                $store
+            );
         }
     }
 }
