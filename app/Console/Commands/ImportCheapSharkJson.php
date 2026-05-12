@@ -174,11 +174,24 @@ class ImportCheapSharkJson extends Command
             $product->fill($attributes)->save();
             $result['product_updated'] = true;
         } else {
-            Product::create(array_merge($attributes, [
+            $product = Product::create(array_merge($attributes, [
                 'game_id' => $game->id,
                 'store_id' => $store->id,
             ]));
             $result['product_created'] = true;
+        }
+
+        $latestHistory = \App\Models\PriceHistory::where('product_id', $product->id)
+            ->orderByDesc('recorded_at')
+            ->first();
+
+        if (!$latestHistory || $latestHistory->price != $product->current_price) {
+            \App\Models\PriceHistory::create([
+                'product_id' => $product->id,
+                'price' => $product->current_price,
+                'currency' => $product->currency,
+                'recorded_at' => now(),
+            ]);
         }
 
         return $result;

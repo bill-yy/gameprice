@@ -101,6 +101,13 @@ class GameController extends Controller
                 'lowestPrice' => $lowestPrice,
                 'highestDiscount' => $highestDiscount,
                 'schema' => $schema,
+                'priceHistories' => $products->mapWithKeys(fn($p) => [
+                    $p->id => $p->priceHistory()
+                        ->where('recorded_at', '>=', now()->subMonths(6))
+                        ->orderBy('recorded_at')
+                        ->get(['price', 'recorded_at'])
+                        ->toArray()
+                ])->toArray(),
             ];
         });
 
@@ -108,6 +115,7 @@ class GameController extends Controller
             'game' => $data['game'],
             'products' => $data['products'],
             'reviews' => $data['reviews'],
+            'priceHistories' => $data['priceHistories'],
             'seo' => [
                 'title' => "{$data['game']['title']} - Compara precios | GamePrice",
                 'description' => "Compra {$data['game']['title']} al mejor precio. Desde {$data['lowestPrice']}€. " . ($data['highestDiscount'] > 0 ? "Ahorra hasta un {$data['highestDiscount']}% " : '') . "en Eneba, Instant Gaming y más tiendas.",

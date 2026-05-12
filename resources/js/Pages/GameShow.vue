@@ -22,6 +22,10 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    priceHistories: {
+        type: Object,
+        default: () => ({}),
+    },
 });
 
 const formatDate = (date) => {
@@ -46,6 +50,109 @@ const genres = computed(() => {
 const schemaScript = computed(() => {
     if (!props.seo.schema) return null;
     return JSON.stringify(props.seo.schema);
+});
+
+const chartColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+
+const hasPriceHistory = computed(() => {
+    return Object.values(props.priceHistories || {}).some(arr => arr && arr.length > 0);
+});
+
+const chartData = computed(() => {
+    if (!hasPriceHistory.value) return null;
+
+    const allPoints = [];
+    const lines = [];
+    let colorIdx = 0;
+
+    for (const product of props.products) {
+        const history = props.priceHistories[product.id];
+        if (!history || history.length === 0) continue;
+
+        const color = chartColors[colorIdx % chartColors.length];
+        colorIdx++;
+
+        const points = history.map(h => ({
+            date: new Date(h.recorded_at),
+            price: parseFloat(h.price),
+        }));
+
+        allPoints.push(...points);
+        lines.push({
+            storeName: product.store?.name || 'Tienda',
+            color,
+            points,
+        });
+    }
+
+    if (allPoints.length === 0) return null;
+
+    const minDate = Math.min(...allPoints.map(p => p.date.getTime()));
+    const maxDate = Math.max(...allPoints.map(p => p.date.getTime()));
+    const minPrice = Math.min(...allPoints.map(p => p.price));
+    const maxPrice = Math.max(...allPoints.map(p => p.price));
+
+    const width = 700;
+    const height = 300;
+    const padTop = 20;
+    const padRight = 20;
+    const padBottom = 40;
+    const padLeft = 60;
+
+    const chartW = width - padLeft - padRight;
+    const chartH = height - padTop - padBottom;
+
+    const xScale = (date) => {
+        if (maxDate === minDate) return padLeft + chartW / 2;
+        return padLeft + ((date.getTime() - minDate) / (maxDate - minDate)) * chartW;
+    };
+
+    const priceRange = maxPrice - minPrice || 1;
+    const yScale = (price) => {
+        return padTop + chartH - ((price - minPrice) / priceRange) * chartH;
+    };
+
+    for (const line of lines) {
+        line.path = line.points.map((p, i) => {
+            const x = xScale(p.date);
+            const y = yScale(p.price);
+            return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
+        }).join(' ');
+    }
+
+    const xTicks = [];
+    const numXTicks = 6;
+    const dateRange = maxDate - minDate || 1;
+    for (let i = 0; i <= numXTicks; i++) {
+        const t = minDate + (dateRange * i) / numXTicks;
+        const date = new Date(t);
+        xTicks.push({
+            x: xScale(date),
+            label: date.toLocaleDateString('es-ES', { month: 'short', year: '2-digit' }),
+        });
+    }
+
+    const yTicks = [];
+    const numYTicks = 5;
+    for (let i = 0; i <= numYTicks; i++) {
+        const price = minPrice + (priceRange * i) / numYTicks;
+        yTicks.push({
+            y: yScale(price),
+            label: price.toFixed(2) + '\u20AC',
+        });
+    }
+
+    return {
+        width,
+        height,
+        padLeft,
+        padTop,
+        chartW,
+        chartH,
+        lines,
+        xTicks,
+        yTicks,
+    };
 });
 </script>
 
@@ -213,6 +320,38 @@ const schemaScript = computed(() => {
 
                 <p v-else class="rounded-lg bg-gray-800 p-8 text-center text-gray-400">
                     No hay precios disponibles para este juego.
+                </p>
+            </div>
+
+            <div class="mt-10">
+                <h2 class="mb-4 text-2xl font-bold">&#x1F4C8; Historial de precios</h2>
+
+                <div v-if="hasPriceHistory && chartData" class="rounded-lg border border-gray-700 bg-gray-800 p-4">
+                    <div class="mb-4 flex flex-wrap gap-3">
+                        <span v-for="line in chartData.lines" :key="line.storeName" class="flex items-center gap-1.5 text-sm text-gray-300">
+                            <span class="inline-block h-3 w-3 rounded-full" :style="{ backgroundColor: line.color }"></span>
+                            {{ line.storeName }}
+                        </span>
+                    </div>
+                    <div class="w-full overflow-x-auto">
+                        <svg :viewBox="`0 0 ${chartData.width} ${chartData.height}`" class="w-full min-w-[600px]" preserveAspectRatio="xMidYMid meet">
+                            <g v-for="tick in chartData.yTicks" :key="'y'+tick.y">
+                                <line :x1="chartData.padLeft" :y1="tick.y" :x2="chartData.padLeft + chartData.chartW" :y2="tick.y" stroke="#374151" stroke-width="0.5" />
+                                <text :x="chartData.padLeft - 8" :y="tick.y" text-anchor="end" dominant-baseline="middle" fill="#9ca3af" font-size="11">{{ tick.label }}</text>
+                            </g>
+                            <g v-for="tick in chartData.xTicks" :key="'x'+tick.x">
+                                <line :x1="tick.x" :y1="chartData.padTop" :x2="tick.x" :y2="chartData.padTop + chartData.chartH" stroke="#374151" stroke-width="0.5" />
+                                <text :x="tick.x" :y="chartData.height - 8" text-anchor="middle" fill="#9ca3af" font-size="11">{{ tick.label }}</text>
+                            </g>
+                            <line :x1="chartData.padLeft" :y1="chartData.padTop + chartData.chartH" :x2="chartData.padLeft + chartData.chartW" :y2="chartData.padTop + chartData.chartH" stroke="#4b5563" stroke-width="1" />
+                            <line :x1="chartData.padLeft" :y1="chartData.padTop" :x2="chartData.padLeft" :y2="chartData.padTop + chartData.chartH" stroke="#4b5563" stroke-width="1" />
+                            <path v-for="line in chartData.lines" :key="line.storeName" :d="line.path" fill="none" :stroke="line.color" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                    </div>
+                </div>
+
+                <p v-else class="rounded-lg bg-gray-800 p-8 text-center text-gray-400">
+                    No hay datos hist\u00f3ricos disponibles
                 </p>
             </div>
 
