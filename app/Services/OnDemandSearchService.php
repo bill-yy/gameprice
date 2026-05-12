@@ -35,7 +35,7 @@ class OnDemandSearchService
 
         dispatch(new \App\Jobs\FetchSteamGameDetails($game));
 
-        dispatch(new FetchPricesForGame($game));
+        dispatchSync(new FetchPricesForGame($game));
 
         return $game;
     }
