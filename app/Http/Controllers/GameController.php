@@ -97,6 +97,7 @@ class GameController extends Controller
             return [
                 'game' => $game->toArray(),
                 'products' => $products->values()->toArray(),
+                'reviews' => $game->reviews->toArray(),
                 'lowestPrice' => $lowestPrice,
                 'highestDiscount' => $highestDiscount,
                 'schema' => $schema,
@@ -106,16 +107,16 @@ class GameController extends Controller
         return Inertia::render('GameShow', [
             'game' => $data['game'],
             'products' => $data['products'],
-            'reviews' => $data['game']->reviews,
+            'reviews' => $data['reviews'],
             'seo' => [
-                'title' => "{$data['game']->title} - Compara precios | GamePrice",
-                'description' => "Compra {$data['game']->title} al mejor precio. Desde {$data['lowestPrice']}€. " . ($data['highestDiscount'] > 0 ? "Ahorra hasta un {$data['highestDiscount']}% " : '') . "en Eneba, Instant Gaming y más tiendas.",
-                'canonical' => route('game.show', $data['game']->slug),
+                'title' => "{$data['game']['title']} - Compara precios | GamePrice",
+                'description' => "Compra {$data['game']['title']} al mejor precio. Desde {$data['lowestPrice']}€. " . ($data['highestDiscount'] > 0 ? "Ahorra hasta un {$data['highestDiscount']}% " : '') . "en Eneba, Instant Gaming y más tiendas.",
+                'canonical' => route('game.show', $data['game']['slug']),
                 'schema' => $data['schema'],
                 'og' => [
-                    'title' => "{$data['game']->title} - Compara precios | GamePrice",
+                    'title' => "{$data['game']['title']} - Compara precios | GamePrice",
                     'description' => "Desde {$data['lowestPrice']}€. Compara ofertas de tiendas oficiales y grey market.",
-                    'image' => $data['game']->cover_image,
+                    'image' => $data['game']['cover_image'],
                     'type' => 'product',
                 ],
             ],

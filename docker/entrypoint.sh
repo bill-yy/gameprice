@@ -15,8 +15,5 @@ php artisan migrate --force || true
 php artisan db:seed --class=StoreSeeder --force || true
 php artisan games:seed-popular || true
 
-# Re-import CheapShark data with extended store mapping
-php artisan prices:import-cheapshark-json || true
-
 # Start Supervisor (manages php-fpm + nginx + queue worker + schedule runner)
 exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
