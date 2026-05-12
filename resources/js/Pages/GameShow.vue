@@ -1,6 +1,6 @@
 <script setup>
 import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import Breadcrumbs from '@/Components/Breadcrumbs.vue';
 import ReviewList from '@/Components/ReviewList.vue';
 import ReviewForm from '@/Components/ReviewForm.vue';
@@ -23,6 +23,10 @@ const props = defineProps({
         default: () => [],
     },
     priceHistories: {
+        type: Object,
+        default: () => ({}),
+    },
+    vouchers: {
         type: Object,
         default: () => ({}),
     },
@@ -95,6 +99,30 @@ const submitAlert = () => {
             alertForm.reset('email', 'target_price');
         },
     });
+};
+
+const copiedCode = ref('');
+
+const getStoreVoucher = (storeId) => {
+    return props.vouchers[storeId] || null;
+};
+
+const getVoucherPrice = (product) => {
+    const voucher = getStoreVoucher(product.store?.id);
+    if (!voucher) return Number(product.current_price);
+    const price = Number(product.current_price);
+    if (voucher.discount_type === 'percentage') {
+        return Math.max(0, price - (price * Number(voucher.discount_value) / 100));
+    }
+    return Math.max(0, price - Number(voucher.discount_value));
+};
+
+const copyCode = (code) => {
+    navigator.clipboard.writeText(code);
+    copiedCode.value = code;
+    setTimeout(() => {
+        copiedCode.value = '';
+    }, 2000);
 };
 
 const chartData = computed(() => {

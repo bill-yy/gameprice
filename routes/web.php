@@ -7,6 +7,7 @@ use App\Http\Controllers\PriceAlertController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReviewController;
 use App\Http\Controllers\SitemapController;
+use App\Http\Controllers\VoucherController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -17,6 +18,7 @@ Route::get('/sitemap.xml', [SitemapController::class, 'index'])->name('sitemap')
 
 Route::post('/alerts', [PriceAlertController::class, 'store'])->name('alerts.store');
 Route::post('/juego/{game}/reviews', [ReviewController::class, 'store'])->name('reviews.store');
+Route::get('/api/vouchers/{store}', [VoucherController::class, 'show']);
 
 Route::get('/dashboard', function () {
     return Inertia::render('Dashboard');

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Game;
 use App\Models\Product;
+use App\Models\Voucher;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
@@ -140,6 +141,13 @@ class GameController extends Controller
                 'lowestPrice' => $lowestPrice,
                 'highestDiscount' => $highestDiscount,
                 'schema' => $schema,
+                'vouchers' => Voucher::whereIn('store_id', $products->pluck('store_id')->unique())
+                    ->where('is_active', true)
+                    ->where('valid_from', '<=', now())
+                    ->where('valid_until', '>=', now())
+                    ->get()
+                    ->keyBy('store_id')
+                    ->toArray(),
                 'priceHistories' => $products->mapWithKeys(fn($p) => [
                     $p->id => $p->priceHistory()
                         ->where('recorded_at', '>=', now()->subMonths(6))
@@ -155,6 +163,7 @@ class GameController extends Controller
             'products' => $data['products'],
             'reviews' => $data['reviews'],
             'priceHistories' => $data['priceHistories'],
+            'vouchers' => $data['vouchers'],
             'seo' => [
                 'title' => "{$data['game']['title']} - Compara precios | GamePrice",
                 'description' => "Compra {$data['game']['title']} al mejor precio. Desde {$data['lowestPrice']}€. " . ($data['highestDiscount'] > 0 ? "Ahorra hasta un {$data['highestDiscount']}% " : '') . "en Eneba, Instant Gaming y más tiendas.",
