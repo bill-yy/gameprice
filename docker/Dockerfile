@@ -50,7 +50,7 @@ RUN npm ci
 COPY . .
 
 # Build de assets y optimización
-ARG CACHE_BUST=3
+ARG CACHE_BUST=4
 RUN composer dump-autoload --optimize \
     && npm run build \
     && rm -rf node_modules
