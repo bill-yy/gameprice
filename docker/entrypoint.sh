@@ -14,5 +14,8 @@ php artisan event:cache || true
 php artisan migrate --force || true
 php artisan games:seed-popular || true
 
+# Run CheapShark scraper once on deploy to populate real prices
+php artisan prices:scrape-cheapshark --pages=50 || true
+
 # Start Supervisor (manages php-fpm + nginx + queue worker + schedule runner)
 exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
