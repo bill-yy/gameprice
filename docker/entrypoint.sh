@@ -30,3 +30,4 @@ php artisan db:seed --class=VoucherSeeder --force || true
 # Start Supervisor (manages php-fpm + nginx + queue worker + schedule runner)
 exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
 # Force rebuild Tue May 12 14:42:50 UTC 2026
+# Force rebuild 1778598081
