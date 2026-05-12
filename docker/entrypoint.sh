@@ -14,8 +14,5 @@ php artisan event:cache || true
 php artisan migrate --force || true
 php artisan games:seed-popular || true
 
-# Populate game details and prices in background so container starts immediately
-(php artisan steam:update-games --limit=50 && php artisan prices:scrape-all) &
-
-# Start Supervisor (manages php-fpm + nginx + queue worker)
+# Start Supervisor (manages php-fpm + nginx + queue worker + schedule runner)
 exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
