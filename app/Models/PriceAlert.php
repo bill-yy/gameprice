@@ -31,4 +31,11 @@ class PriceAlert extends Model
     {
         return $this->belongsTo(Game::class);
     }
+
+    public function shouldNotify(float $price): bool
+    {
+        return $this->is_active
+            && $this->notified_at === null
+            && $price <= (float) $this->target_price;
+    }
 }
