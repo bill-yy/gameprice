@@ -150,6 +150,16 @@ class StoreSeeder extends Seeder
                 'is_official' => false,
                 'is_active' => true,
             ],
+            [
+                'name' => 'G2A',
+                'slug' => 'g2a',
+                'website' => 'https://www.g2a.com',
+                'logo_url' => 'https://www.g2a.com/favicon.ico',
+                'affiliate_program' => null,
+                'commission_rate' => 0.00,
+                'is_official' => false,
+                'is_active' => true,
+            ],
         ];
 
         foreach ($stores as $store) {

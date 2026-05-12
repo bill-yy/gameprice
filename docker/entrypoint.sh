@@ -19,6 +19,7 @@ php artisan games:seed-popular || true
 php artisan prices:import-cheapshark-json || true
 php artisan prices:import-eneba-json || true
 php artisan gamivo:import-json || true
+php artisan g2a:import-json || true
 
 # Start Supervisor (manages php-fpm + nginx + queue worker + schedule runner)
 exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
