@@ -15,8 +15,9 @@ php artisan migrate --force || true
 php artisan db:seed --class=StoreSeeder --force || true
 php artisan games:seed-popular || true
 
-# Re-import real prices from CheapShark JSON (idempotent, restores is_real_price=true)
+# Re-import real prices from JSON sources
 php artisan prices:import-cheapshark-json || true
+php artisan prices:import-eneba-json || true
 
 # Start Supervisor (manages php-fpm + nginx + queue worker + schedule runner)
 exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
