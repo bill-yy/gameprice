@@ -10,16 +10,40 @@ const props = defineProps({
         type: Boolean,
         default: false,
     },
+    showDiscount: {
+        type: Boolean,
+        default: false,
+    },
+    showReleaseDate: {
+        type: Boolean,
+        default: false,
+    },
 });
 
+const realPriceProducts = (products) => {
+    if (!products?.length) return [];
+    return products.filter((p) => p.is_real_price);
+};
+
 const lowestPrice = (products) => {
-    if (!products?.length) return null;
-    return Math.min(...products.map((p) => Number(p.current_price)));
+    const real = realPriceProducts(products);
+    if (!real.length) return null;
+    return Math.min(...real.map((p) => Number(p.current_price)));
 };
 
 const maxDiscount = (products) => {
-    if (!products?.length) return 0;
-    return Math.max(...products.map((p) => Number(p.discount_percent)));
+    const real = realPriceProducts(products);
+    if (!real.length) return 0;
+    return Math.max(...real.map((p) => Number(p.discount_percent)));
+};
+
+const formatDate = (date) => {
+    if (!date) return '';
+    return new Date(date).toLocaleDateString('es-ES', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+    });
 };
 </script>
 
@@ -30,7 +54,7 @@ const maxDiscount = (products) => {
     >
         <!-- Discount badge corner -->
         <div
-            v-if="maxDiscount(game.products) > 0"
+            v-if="showDiscount && maxDiscount(game.products) > 0"
             class="absolute right-0 top-0 z-10 rounded-bl-lg bg-red-600 px-2 py-1 text-xs font-bold text-white shadow-md"
         >
             -{{ maxDiscount(game.products) }}%
@@ -54,6 +78,9 @@ const maxDiscount = (products) => {
                 {{ game.title }}
             </h3>
             <p class="mt-1 text-xs text-gray-400">{{ game.developer }}</p>
+            <div v-if="showReleaseDate && game.release_date" class="mt-1 text-xs text-gray-500">
+                {{ formatDate(game.release_date) }}
+            </div>
             <div class="mt-2 flex items-center justify-between">
                 <span v-if="lowestPrice(game.products) !== null" class="text-sm font-bold text-green-400">
                     desde {{ lowestPrice(game.products).toFixed(2) }}&euro;

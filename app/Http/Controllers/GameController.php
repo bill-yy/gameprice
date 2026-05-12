@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Game;
+use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
@@ -33,8 +34,37 @@ class GameController extends Controller
             return $paginator->toArray();
         });
 
+        $trending = Game::query()
+            ->with(['products' => fn($q) => $q->where('is_real_price', true)->orderBy('current_price')])
+            ->whereHas('products', fn($q) => $q->where('is_real_price', true))
+            ->orderByDesc('metacritic_score')
+            ->limit(8)
+            ->get();
+
+        $bestDeals = Game::query()
+            ->with(['products' => fn($q) => $q->where('is_real_price', true)->orderBy('current_price')])
+            ->whereHas('products', fn($q) => $q->where('is_real_price', true)->where('discount_percent', '>', 50))
+            ->orderByDesc(
+                Product::selectRaw('MAX(discount_percent)')
+                    ->whereColumn('products.game_id', 'games.id')
+            )
+            ->limit(8)
+            ->get();
+
+        $newReleases = Game::query()
+            ->with(['products' => fn($q) => $q->where('is_real_price', true)->orderBy('current_price')])
+            ->whereNotNull('release_date')
+            ->where('release_date', '>=', now()->subDays(30))
+            ->whereHas('products', fn($q) => $q->where('is_real_price', true))
+            ->orderByDesc('release_date')
+            ->limit(8)
+            ->get();
+
         return Inertia::render('Home', [
             'games' => $games,
+            'trendingGames' => $trending,
+            'bestDeals' => $bestDeals,
+            'newReleases' => $newReleases,
             'filters' => $request->only('search'),
             'seo' => [
                 'title' => 'GamePrice.es - Compara precios de videojuegos',

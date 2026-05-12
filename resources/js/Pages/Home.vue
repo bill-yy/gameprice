@@ -12,6 +12,18 @@ const props = defineProps({
         type: Object,
         required: true,
     },
+    trendingGames: {
+        type: Array,
+        default: () => [],
+    },
+    bestDeals: {
+        type: Array,
+        default: () => [],
+    },
+    newReleases: {
+        type: Array,
+        default: () => [],
+    },
     filters: {
         type: Object,
         default: () => ({}),
@@ -70,38 +82,86 @@ const bestPriceSlug = computed(() => {
         <main class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
             <Breadcrumbs :items="[{ label: 'Inicio' }]" />
 
-            <div v-if="loading" class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-                <SkeletonCard v-for="n in 8" :key="n" />
-            </div>
+            <!-- Hero Section -->
+            <section class="py-12 text-center">
+                <h1 class="text-4xl font-extrabold tracking-tight text-white sm:text-5xl">
+                    Encuentra los mejores precios de videojuegos
+                </h1>
+                <p class="mx-auto mt-4 max-w-2xl text-lg text-gray-400">
+                    Compara ofertas de tiendas oficiales y grey market en segundos
+                </p>
+                <div class="mx-auto mt-8 max-w-lg">
+                    <SearchBar v-model="search" />
+                </div>
+            </section>
 
-            <div v-else-if="games.data.length > 0" class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
-                <GameCard
-                    v-for="game in games.data"
-                    :key="game.slug"
-                    :game="game"
-                    :is-best-price="game.slug === bestPriceSlug"
-                />
-            </div>
+            <!-- Trending Section -->
+            <section v-if="trendingGames.length" class="mb-12">
+                <h2 class="mb-4 text-2xl font-bold text-white">🔥 Juegos Trending</h2>
+                <div class="flex gap-4 overflow-x-auto pb-4">
+                    <div v-for="game in trendingGames" :key="game.slug" class="w-60 flex-shrink-0">
+                        <GameCard :game="game" />
+                    </div>
+                </div>
+            </section>
 
-            <div v-else class="py-20 text-center">
-                <p class="text-xl text-gray-400">No se encontraron juegos</p>
-            </div>
+            <!-- Best Deals Section -->
+            <section v-if="bestDeals.length" class="mb-12">
+                <h2 class="mb-4 text-2xl font-bold text-white">💎 Mejores Descuentos</h2>
+                <div class="flex gap-4 overflow-x-auto pb-4">
+                    <div v-for="game in bestDeals" :key="game.slug" class="w-60 flex-shrink-0">
+                        <GameCard :game="game" :show-discount="true" />
+                    </div>
+                </div>
+            </section>
 
-            <div v-if="games.last_page > 1" class="mt-8 flex justify-center gap-2">
-                <Link
-                    v-for="page in games.last_page"
-                    :key="page"
-                    :href="route('home', { page, search: filters.search })"
-                    :class="[
-                        'rounded-lg px-4 py-2 text-sm font-medium transition',
-                        page === games.current_page
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600',
-                    ]"
-                >
-                    {{ page }}
-                </Link>
-            </div>
+            <!-- New Releases Section -->
+            <section v-if="newReleases.length" class="mb-12">
+                <h2 class="mb-4 text-2xl font-bold text-white">🆕 Últimos Lanzamientos</h2>
+                <div class="flex gap-4 overflow-x-auto pb-4">
+                    <div v-for="game in newReleases" :key="game.slug" class="w-60 flex-shrink-0">
+                        <GameCard :game="game" :show-release-date="true" />
+                    </div>
+                </div>
+            </section>
+
+            <!-- All Games Section -->
+            <section class="mb-12">
+                <h2 class="mb-4 text-2xl font-bold text-white">Todos los juegos</h2>
+
+                <div v-if="loading" class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+                    <SkeletonCard v-for="n in 8" :key="n" />
+                </div>
+
+                <div v-else-if="games.data.length > 0" class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+                    <GameCard
+                        v-for="game in games.data"
+                        :key="game.slug"
+                        :game="game"
+                        :is-best-price="game.slug === bestPriceSlug"
+                    />
+                </div>
+
+                <div v-else class="py-20 text-center">
+                    <p class="text-xl text-gray-400">No se encontraron juegos</p>
+                </div>
+
+                <div v-if="games.last_page > 1" class="mt-8 flex justify-center gap-2">
+                    <Link
+                        v-for="page in games.last_page"
+                        :key="page"
+                        :href="route('home', { page, search: filters.search })"
+                        :class="[
+                            'rounded-lg px-4 py-2 text-sm font-medium transition',
+                            page === games.current_page
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600',
+                        ]"
+                    >
+                        {{ page }}
+                    </Link>
+                </div>
+            </section>
         </main>
 
         <AppFooter />
