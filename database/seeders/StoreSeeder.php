@@ -94,7 +94,7 @@ class StoreSeeder extends Seeder
                 'name' => 'Gamesplanet',
                 'slug' => 'gamesplanet',
                 'website' => 'https://www.gamesplanet.com',
-                'logo_url' => null,
+                'logo_url' => 'https://www.gamesplanet.com/favicon.ico',
                 'affiliate_program' => 'gamesplanet',
                 'commission_rate' => 5.00,
                 'is_official' => true,
