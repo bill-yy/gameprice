@@ -24,7 +24,7 @@ class StoreSeeder extends Seeder
                 'name' => 'Instant Gaming',
                 'slug' => 'instant-gaming',
                 'website' => 'https://www.instant-gaming.com',
-                'logo_url' => null,
+                'logo_url' => 'https://www.instant-gaming.com/favicon.ico',
                 'affiliate_program' => 'instant-gaming',
                 'commission_rate' => 5.00,
                 'is_official' => false,

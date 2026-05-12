@@ -20,6 +20,7 @@ php artisan prices:import-cheapshark-json || true
 php artisan prices:import-eneba-json || true
 php artisan gamivo:import-json || true
 php artisan g2a:import-json || true
+php artisan instantgaming:import-json || true
 
 # Seed vouchers
 php artisan db:seed --class=VoucherSeeder --force || true
