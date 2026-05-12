@@ -12,7 +12,7 @@ class CheapSharkScraper
         try {
             $url = 'https://www.cheapshark.com/api/1.0/deals?title=' . urlencode($query) . '&pageSize=5&sortBy=Price';
 
-            $response = Http::timeout(15)->get($url);
+            $response = Http::timeout(10)->get($url);
 
             if (!$response->successful()) {
                 return null;

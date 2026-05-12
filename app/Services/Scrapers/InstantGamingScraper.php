@@ -50,7 +50,7 @@ class InstantGamingScraper
             'Accept-Language' => 'en-US,en;q=0.9',
             'Accept-Encoding' => 'gzip, deflate',
             'Referer' => 'https://www.instant-gaming.com/',
-        ])->timeout(30)->get($url);
+        ])->timeout(10)->get($url);
 
         if (!$response->successful()) {
             Log::debug('Instant Gaming: HTTP ' . $response->status() . ' for query: ' . $query);

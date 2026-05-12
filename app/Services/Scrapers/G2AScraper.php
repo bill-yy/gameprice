@@ -49,7 +49,7 @@ class G2AScraper
             'Accept-Language' => 'en-US,en;q=0.9',
             'Referer' => 'https://www.g2a.com/',
             'Origin' => 'https://www.g2a.com',
-        ])->timeout(30)->post('https://www.g2a.com/search/api/v3/products', [
+        ])->timeout(10)->post('https://www.g2a.com/search/api/v3/products', [
             'itemsPerPage' => 24,
             'include' => 'categories,categoryTree,media,regions,attributes,developerName,publisherName,discount',
             'updatedAfter' => null,

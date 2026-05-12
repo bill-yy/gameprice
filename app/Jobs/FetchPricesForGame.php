@@ -14,7 +14,6 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -68,9 +67,7 @@ class FetchPricesForGame implements ShouldQueue
                 ]);
             }
 
-            usleep(500_000);
+            usleep(200_000);
         }
-
-        Cache::flush();
     }
 }

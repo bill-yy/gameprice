@@ -35,9 +35,7 @@ class OnDemandSearchService
 
         dispatch(new \App\Jobs\FetchSteamGameDetails($game));
 
-        // TEMPORARY: synchronous execution for debugging
-        $job = new FetchPricesForGame($game);
-        $job->handle();
+        dispatch(new FetchPricesForGame($game));
 
         return $game;
     }
