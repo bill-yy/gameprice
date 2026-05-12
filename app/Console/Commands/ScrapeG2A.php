@@ -3,7 +3,10 @@
 namespace App\Console\Commands;
 
 use App\Models\Game;
+use App\Models\Product;
+use App\Models\Store;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -15,6 +18,17 @@ class ScrapeG2A extends Command
 
     public function handle(): int
     {
+        $store = Store::firstOrCreate(
+            ['slug' => 'g2a'],
+            [
+                'name' => 'G2A',
+                'website' => 'https://www.g2a.com',
+                'logo_url' => 'https://www.g2a.com/favicon.ico',
+                'is_active' => true,
+                'is_official' => false,
+            ]
+        );
+
         $games = Game::where('is_active', true)
             ->whereNotNull('title')
             ->orderByDesc('metacritic_score')
@@ -72,6 +86,29 @@ class ScrapeG2A extends Command
             $path = base_path('data/g2a_prices.json');
             file_put_contents($path, json_encode($results, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
             $this->info('G2A: saved ' . count($results) . ' prices to data/g2a_prices.json');
+
+            foreach ($results as $result) {
+                $game = Game::where('title', $result['game_title'])->first();
+                if ($game) {
+                    Product::updateOrCreate(
+                        ['game_id' => $game->id, 'store_id' => $store->id],
+                        [
+                            'current_price' => $result['price_eur'],
+                            'original_price' => $result['original_price_eur'],
+                            'discount_percent' => $result['discount_percent'],
+                            'url' => $result['url'],
+                            'affiliate_url' => $result['url'],
+                            'is_real_price' => true,
+                            'currency' => 'EUR',
+                            'platform' => 'PC',
+                            'region' => $result['region'] ?? 'global',
+                            'type' => 'key',
+                            'in_stock' => $result['in_stock'],
+                        ]
+                    );
+                }
+            }
+            Cache::flush();
         } else {
             $this->warn('G2A: no prices found.');
         }

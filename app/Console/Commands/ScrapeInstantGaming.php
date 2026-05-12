@@ -7,6 +7,7 @@ use App\Models\Product;
 use App\Models\Store;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class ScrapeInstantGaming extends Command
@@ -89,6 +90,29 @@ class ScrapeInstantGaming extends Command
             $path = base_path('data/instantgaming_prices.json');
             file_put_contents($path, json_encode($results, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
             $this->info('Instant Gaming: saved ' . count($results) . ' prices to data/instantgaming_prices.json');
+
+            foreach ($results as $result) {
+                $game = Game::where('title', $result['game_title'])->first();
+                if ($game) {
+                    Product::updateOrCreate(
+                        ['game_id' => $game->id, 'store_id' => $store->id],
+                        [
+                            'current_price' => $result['price_eur'],
+                            'original_price' => $result['original_price_eur'],
+                            'discount_percent' => $result['discount_percent'],
+                            'url' => $result['url'],
+                            'affiliate_url' => $result['url'],
+                            'is_real_price' => true,
+                            'currency' => 'EUR',
+                            'platform' => 'PC',
+                            'region' => 'global',
+                            'type' => 'key',
+                            'in_stock' => $result['in_stock'],
+                        ]
+                    );
+                }
+            }
+            Cache::flush();
         } else {
             $this->warn('Instant Gaming: no prices found.');
         }
