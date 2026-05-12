@@ -120,7 +120,7 @@ const schemaScript = computed(() => {
             <div class="mt-10">
                 <h2 class="mb-4 text-2xl font-bold">Comparar precios</h2>
 
-                <div v-if="products.length > 0" class="overflow-x-auto rounded-lg border border-gray-700">
+                <div v-if="products.length > 0 && products.some(p => p.is_real_price)" class="overflow-x-auto rounded-lg border border-gray-700">
                     <table class="w-full min-w-[640px] text-left text-sm">
                         <thead class="bg-gray-800 text-xs uppercase text-gray-400">
                             <tr>
@@ -141,7 +141,7 @@ const schemaScript = computed(() => {
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-700">
-                            <tr v-for="(product, index) in products" :key="product.id" class="bg-gray-800 hover:bg-gray-750">
+                            <tr v-for="(product, index) in products.filter(p => p.is_real_price)" :key="product.id" class="bg-gray-800 hover:bg-gray-750">
                                 <td class="px-4 py-3">
                                     <div class="flex items-center gap-2">
                                         <img
