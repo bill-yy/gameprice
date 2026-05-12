@@ -60,6 +60,15 @@ class GameController extends Controller
             ->limit(8)
             ->get();
 
+        if ($search && count($games['data'] ?? []) === 0) {
+            $onDemand = app(\App\Services\OnDemandSearchService::class);
+            $found = $onDemand->search($search);
+
+            if ($found) {
+                return redirect()->route('game.show', $found->slug);
+            }
+        }
+
         return Inertia::render('Home', [
             'games' => $games,
             'trendingGames' => $trending,

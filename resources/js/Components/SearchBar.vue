@@ -1,4 +1,5 @@
 <script setup>
+import { ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 
 const props = defineProps({
@@ -10,9 +11,20 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue', 'search']);
 
+const searching = ref(false);
+
 const onSearch = () => {
     emit('search', props.modelValue);
-    router.get(route('home'), { search: props.modelValue }, { preserveState: true, preserveScroll: true });
+    searching.value = true;
+    router.get(route('home'), { search: props.modelValue }, {
+        preserveState: true,
+        preserveScroll: true,
+        onFinish: () => {
+            setTimeout(() => {
+                searching.value = false;
+            }, 5000);
+        },
+    });
 };
 </script>
 
@@ -31,5 +43,8 @@ const onSearch = () => {
             placeholder="Buscar juegos..."
             class="w-full rounded-lg border border-gray-600 bg-gray-800 py-2 pl-10 pr-4 text-sm text-white placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
         />
+        <div v-if="searching" class="mt-1 text-xs text-blue-400 animate-pulse">
+            Buscando en tiendas...
+        </div>
     </div>
 </template>
