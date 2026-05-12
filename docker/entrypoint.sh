@@ -14,8 +14,5 @@ php artisan event:cache || true
 php artisan migrate --force || true
 php artisan games:seed-popular || true
 
-# Run CheapShark import from pre-fetched JSON
-php artisan prices:import-cheapshark-json || true
-
 # Start Supervisor (manages php-fpm + nginx + queue worker + schedule runner)
 exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
