@@ -1,5 +1,5 @@
 <script setup>
-import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
+import { Head, Link, useForm, usePage, router } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import Breadcrumbs from '@/Components/Breadcrumbs.vue';
 import ReviewList from '@/Components/ReviewList.vue';
@@ -115,6 +115,17 @@ const storeStars = (rating) => {
 };
 
 const copiedCode = ref('');
+
+const refreshing = ref(false);
+
+const refreshPrices = () => {
+    refreshing.value = true;
+    router.post(route('game.refresh-prices', props.game.slug), {}, {
+        onFinish: () => {
+            refreshing.value = false;
+        },
+    });
+};
 
 const getStoreVoucher = (storeId) => {
     return props.vouchers[storeId] || null;
@@ -259,6 +270,10 @@ const chartData = computed(() => {
         </header>
 
         <main class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+            <div v-if="page.props.flash?.success && products.length > 0" class="mb-6 rounded-lg bg-green-900/50 border border-green-700 p-3 text-sm text-green-300">
+                {{ page.props.flash.success }}
+            </div>
+
             <Breadcrumbs :items="[
                 { label: 'Inicio', href: '/' },
                 { label: game.title },
@@ -435,6 +450,14 @@ const chartData = computed(() => {
 
                 <p v-else class="rounded-lg bg-gray-800 p-8 text-center text-gray-400">
                     No hay precios disponibles para este juego.
+                    <button
+                        v-if="products.length === 0"
+                        @click="refreshPrices"
+                        :disabled="refreshing"
+                        class="mt-4 inline-block rounded-lg bg-blue-600 px-6 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
+                    >
+                        {{ refreshing ? 'Actualizando...' : '🔄 Actualizar precios' }}
+                    </button>
                 </p>
             </div>
 

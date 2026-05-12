@@ -6,6 +6,7 @@ use App\Models\Game;
 use App\Models\Product;
 use App\Models\Store;
 use App\Models\Voucher;
+use App\Jobs\FetchPricesForGame;
 use App\Services\OnDemandSearchService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -240,6 +241,15 @@ class GameController extends Controller
                 ],
             ],
         ]);
+    }
+
+    public function refreshPrices(Game $game)
+    {
+        FetchPricesForGame::dispatchSync($game);
+
+        Cache::forget("games.show.{$game->slug}");
+
+        return back()->with('success', 'Precios actualizados');
     }
 
     public function searchSuggestions(Request $request)
