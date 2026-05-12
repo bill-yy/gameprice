@@ -1,0 +1,12 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:80"
+    environment:
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - APP_KEY=${APP_KEY:-base64:generate-with-artisan-key-generate}
+      - API_RATE_LIMIT=100
+      - API_KEYS=dev-key-change-me-in-production
+    restart: unless-stopped
