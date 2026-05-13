@@ -8,7 +8,7 @@ Route::get('/debug-health', function () {
 });
 
 Route::get('/debug-model/{game}', function (\App\Models\Game $game) {
-    return response()->json(['game_id' => $game->id, 'title' => $game->title]);
+    return response()->json(['game_id' => $game->id, 'title' => $game->title, 'slug' => $game->slug]);
 });
 
 Route::get('/debug-scraper/{game}', function (\App\Models\Game $game) {
