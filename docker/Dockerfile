@@ -46,6 +46,10 @@ RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist
 COPY package.json package-lock.json* ./
 RUN npm ci
 
+# Cache buster — change this to invalidate COPY . .
+ARG CACHE_BUST_COPY=smart-refresh-v6
+RUN echo "Copy bust: ${CACHE_BUST_COPY}" > /dev/null
+
 # Copiar todo el código
 COPY . .
 
