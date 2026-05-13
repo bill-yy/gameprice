@@ -113,6 +113,7 @@ class FetchPricesForGame implements ShouldQueue
                                 'region' => $result['region'] ?? 'global',
                                 'type' => $type,
                                 'in_stock' => $result['in_stock'] ?? true,
+                                'price_fetched_at' => now(),
                             ],
                         );
 
@@ -130,7 +131,7 @@ class FetchPricesForGame implements ShouldQueue
                     ]);
                 }
 
-                usleep(100_000);
+                usleep(300_000);
             }
         } catch (Throwable $e) {
             Log::critical("FetchPricesForGame: FATAL ERROR in main loop for game {$this->game->id}", [
