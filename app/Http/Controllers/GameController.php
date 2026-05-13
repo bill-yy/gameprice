@@ -223,6 +223,17 @@ class GameController extends Controller
             ];
         });
 
+        $lastFetched = Product::where('game_id', $game->id)
+            ->where('is_real_price', true)
+            ->max('price_fetched_at');
+
+        $needsRefresh = !$lastFetched || \Carbon\Carbon::parse($lastFetched)->diffInHours(now()) >= 24;
+
+        if ($needsRefresh) {
+            FetchPricesForGame::dispatch($game);
+            Cache::forget($cacheKey);
+        }
+
         return Inertia::render('GameShow', [
             'game' => $data['game'],
             'products' => $data['products'],
