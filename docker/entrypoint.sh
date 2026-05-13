@@ -27,6 +27,10 @@ php artisan gamesplanet:import-json || true
 # Seed vouchers
 php artisan db:seed --class=VoucherSeeder --force || true
 
+# Fix storage permissions for logs and caches
+chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
+chmod -R 775 /var/www/storage /var/www/bootstrap/cache
+
 # Start Supervisor (manages php-fpm + nginx + queue worker + schedule runner)
 exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
 # Force rebuild Wed May 13 2026
