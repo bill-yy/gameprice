@@ -4,74 +4,43 @@ namespace App\Http\Controllers;
 
 use App\Models\Game;
 use App\Models\Product;
-use App\Services\Scrapers\CDKeysScraper;
-use App\Services\Scrapers\CheapSharkScraper;
-use App\Services\Scrapers\EnebaScraper;
-use App\Services\Scrapers\G2AScraper;
-use App\Services\Scrapers\InstantGamingScraper;
-use App\Services\Scrapers\KinguinScraper;
-use App\Services\Scrapers\PSNStoreScraper;
-use App\Services\Scrapers\XboxStoreScraper;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 
 class DebugScraperController extends Controller
 {
     private const SCRAPERS = [
-        'cheapshark' => CheapSharkScraper::class,
-        'eneba' => EnebaScraper::class,
-        'instant-gaming' => InstantGamingScraper::class,
-        'g2a' => G2AScraper::class,
-        'kinguin' => KinguinScraper::class,
-        'cdkeys' => CDKeysScraper::class,
-        'psn-store' => PSNStoreScraper::class,
-        'xbox-store' => XboxStoreScraper::class,
+        'cheapshark' => \App\Services\Scrapers\CheapSharkScraper::class,
+        'eneba' => \App\Services\Scrapers\EnebaScraper::class,
+        'instant-gaming' => \App\Services\Scrapers\InstantGamingScraper::class,
+        'g2a' => \App\Services\Scrapers\G2AScraper::class,
+        'kinguin' => \App\Services\Scrapers\KinguinScraper::class,
+        'cdkeys' => \App\Services\Scrapers\CDKeysScraper::class,
+        'psn-store' => \App\Services\Scrapers\PSNStoreScraper::class,
+        'xbox-store' => \App\Services\Scrapers\XboxStoreScraper::class,
     ];
 
     public function diagnose(Game $game): JsonResponse
     {
-        $results = [];
-        $totalStart = microtime(true);
-
-        foreach (self::SCRAPERS as $slug => $scraperClass) {
-            $start = microtime(true);
-
-            try {
-                $scraper = new $scraperClass;
-                $result = $scraper->search($game->title);
-                $elapsed = round(microtime(true) - $start, 3);
-
-                $results[$slug] = [
-                    'success' => true,
-                    'elapsed_seconds' => $elapsed,
-                    'found' => $result !== null,
-                    'data' => $result,
-                ];
-            } catch (\Throwable $e) {
-                $elapsed = round(microtime(true) - $start, 3);
-
-                $results[$slug] = [
-                    'success' => false,
-                    'elapsed_seconds' => $elapsed,
-                    'found' => false,
-                    'error' => $e->getMessage(),
-                    'exception' => get_class($e),
-                    'file' => $e->getFile() . ':' . $e->getLine(),
-                ];
-            }
-        }
-
-        $totalElapsed = round(microtime(true) - $totalStart, 3);
-
-        $existingProducts = Product::where('game_id', $game->id)
+        $products = Product::where('game_id', $game->id)
             ->with('store:id,name,slug')
             ->get()
             ->map(fn ($p) => [
                 'store' => $p->store?->name ?? $p->store?->slug ?? 'Unknown',
                 'platform' => $p->platform,
                 'price' => $p->current_price,
-                'url' => $p->url,
+                'is_real_price' => $p->is_real_price,
                 'price_fetched_at' => $p->price_fetched_at?->toIso8601String(),
             ]);
+
+        $pendingJobs = 0;
+        if (config('queue.default') === 'database') {
+            try {
+                $pendingJobs = DB::table('jobs')->count();
+            } catch (\Throwable $e) {
+                $pendingJobs = 'error: ' . $e->getMessage();
+            }
+        }
 
         return response()->json([
             'game' => [
@@ -79,10 +48,11 @@ class DebugScraperController extends Controller
                 'title' => $game->title,
                 'slug' => $game->slug,
             ],
-            'total_elapsed_seconds' => $totalElapsed,
-            'scrapers' => $results,
-            'existing_products_count' => $existingProducts->count(),
-            'existing_products' => $existingProducts,
+            'products_count' => $products->count(),
+            'products' => $products,
+            'scrapers' => array_keys(self::SCRAPERS),
+            'queue_connection' => config('queue.default'),
+            'pending_jobs' => $pendingJobs,
         ]);
     }
 }
