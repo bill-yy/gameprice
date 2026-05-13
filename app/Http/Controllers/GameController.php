@@ -10,6 +10,7 @@ use App\Jobs\FetchPricesForGame;
 use App\Services\OnDemandSearchService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class GameController extends Controller
@@ -243,13 +244,22 @@ class GameController extends Controller
         ]);
     }
 
-    public function refreshPrices(Game $game)
+    public function refreshPrices(Request $request, Game $game)
     {
+        Log::info('refreshPrices: START', [
+            'game_id' => $game->id,
+            'game_title' => $game->title,
+            'is_ajax' => $request->ajax(),
+            'wants_json' => $request->wantsJson(),
+            'x_requested_with' => $request->header('X-Requested-With'),
+        ]);
+
         try {
             $previousLimit = ini_get('max_execution_time');
             set_time_limit(60);
 
-            Product::where('game_id', $game->id)->where('is_real_price', false)->delete();
+            $deleted = Product::where('game_id', $game->id)->where('is_real_price', false)->delete();
+            Log::info('refreshPrices: deleted non-real products', ['count' => $deleted]);
 
             $job = new FetchPricesForGame($game);
             $job->handle();
@@ -260,15 +270,82 @@ class GameController extends Controller
                 set_time_limit((int) $previousLimit);
             }
 
+            Log::info('refreshPrices: SUCCESS', ['game_id' => $game->id]);
+
+            if ($request->wantsJson() || $request->header('X-Requested-With') === 'XMLHttpRequest') {
+                return response()->json(['success' => true, 'message' => 'Precios actualizados']);
+            }
+
             return back()->with('success', 'Precios actualizados');
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('refreshPrices failed', [
+            Log::error('refreshPrices: FAILED', [
                 'game_id' => $game->id,
-                'error' => $e->getMessage(),
+                'game_title' => $game->title,
+                'exception_class' => get_class($e),
+                'message' => $e->getMessage(),
+                'file' => $e->getFile() . ':' . $e->getLine(),
                 'trace' => $e->getTraceAsString(),
             ]);
 
+            if ($request->wantsJson() || $request->header('X-Requested-With') === 'XMLHttpRequest') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Error al actualizar precios.',
+                    'error' => config('app.debug') ? $e->getMessage() : null,
+                    'file' => config('app.debug') ? $e->getFile() . ':' . $e->getLine() : null,
+                ], 500);
+            }
+
             return back()->with('error', 'Error al actualizar precios. Inténtalo de nuevo.');
+        }
+    }
+
+    public function testScraper(Game $game)
+    {
+        Log::info('testScraper: START', [
+            'game_id' => $game->id,
+            'game_title' => $game->title,
+        ]);
+
+        try {
+            $scraper = new \App\Services\Scrapers\CheapSharkScraper();
+            $result = $scraper->search($game->title);
+
+            Log::info('testScraper: RESULT', [
+                'game_id' => $game->id,
+                'result' => $result,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'game' => [
+                    'id' => $game->id,
+                    'title' => $game->title,
+                    'slug' => $game->slug,
+                ],
+                'scraper' => 'CheapShark',
+                'result' => $result,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('testScraper: FAILED', [
+                'game_id' => $game->id,
+                'exception_class' => get_class($e),
+                'message' => $e->getMessage(),
+                'file' => $e->getFile() . ':' . $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'game' => [
+                    'id' => $game->id,
+                    'title' => $game->title,
+                ],
+                'error' => $e->getMessage(),
+                'exception_class' => get_class($e),
+                'file' => $e->getFile() . ':' . $e->getLine(),
+                'trace' => config('app.debug') ? $e->getTraceAsString() : null,
+            ], 500);
         }
     }
 

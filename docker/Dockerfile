@@ -50,8 +50,10 @@ RUN npm ci
 COPY . .
 
 # Build de assets y optimización
-ARG CACHE_BUST=14
-RUN composer dump-autoload --optimize \
+# ARG must be consumed in a RUN to bust Docker cache
+ARG CACHE_BUST=default
+RUN echo "Build ID: ${CACHE_BUST}" > /dev/null \
+    && composer dump-autoload --optimize \
     && npm run build \
     && rm -rf node_modules
 
@@ -72,4 +74,4 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 EXPOSE 80
 
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
-# Deploy trigger 1778674408
+# Deploy trigger 1778700000

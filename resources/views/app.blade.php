@@ -15,6 +15,12 @@
         @routes
         @vite(['resources/js/app.js', "resources/js/Pages/{$page['component']}.vue"])
         @inertiaHead
+        <script>
+            if (window.axios && document.querySelector('meta[name="csrf-token"]')) {
+                window.axios.defaults.headers.common['X-CSRF-TOKEN'] =
+                    document.querySelector('meta[name="csrf-token"]').content;
+            }
+        </script>
     </head>
     <body class="font-sans antialiased">
         @inertia

@@ -16,6 +16,7 @@ Route::get('/api/search/suggestions', [GameController::class, 'searchSuggestions
 Route::post('/search/steam', [GameController::class, 'searchOnDemand'])->name('search.steam');
 Route::get('/juego/{game}', [GameController::class, 'show'])->name('game.show');
 Route::post('/juego/{game}/refresh-prices', [GameController::class, 'refreshPrices'])->name('game.refresh-prices');
+Route::get('/test-scraper/{game}', [GameController::class, 'testScraper'])->name('game.test-scraper');
 Route::get('/categoria/{genre}', [GenreController::class, 'show'])->name('genre.show');
 Route::get('/sitemap.xml', [SitemapController::class, 'index'])->name('sitemap');
 

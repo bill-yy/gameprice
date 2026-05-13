@@ -7,6 +7,13 @@ use Illuminate\Support\Facades\Log;
 
 class CheapSharkScraper
 {
+    private const USD_TO_EUR = 0.92;
+
+    private function usdToEur(float $usd): float
+    {
+        return round($usd * self::USD_TO_EUR, 2);
+    }
+
     public function search(string $query): ?array
     {
         try {
@@ -58,8 +65,8 @@ class CheapSharkScraper
 
         return [
             'name' => $bestMatch['title'] ?? null,
-            'price_eur' => $salePrice,
-            'original_price_eur' => $normalPrice,
+            'price_eur' => $this->usdToEur($salePrice),
+            'original_price_eur' => $this->usdToEur($normalPrice),
             'discount_percent' => $discount,
             'url' => $dealUrl,
             'in_stock' => $salePrice > 0,
@@ -94,8 +101,8 @@ class CheapSharkScraper
 
         return [
             'name' => $bestMatch['external'] ?? null,
-            'price_eur' => $cheapest,
-            'original_price_eur' => $cheapest,
+            'price_eur' => $this->usdToEur($cheapest),
+            'original_price_eur' => $this->usdToEur($cheapest),
             'discount_percent' => 0,
             'url' => $dealUrl,
             'in_stock' => $cheapest > 0,
