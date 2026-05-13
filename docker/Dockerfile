@@ -47,7 +47,7 @@ COPY package.json package-lock.json* ./
 RUN npm ci
 
 # Cache buster — change this to invalidate COPY . .
-ARG CACHE_BUST_COPY=smart-refresh-v6
+ARG CACHE_BUST_COPY=task19-debug-v7
 RUN echo "Copy bust: ${CACHE_BUST_COPY}" > /dev/null
 
 # Copiar todo el código
@@ -55,7 +55,7 @@ COPY . .
 
 # Build de assets y optimización
 # ARG must be consumed in a RUN to bust Docker cache
-ARG CACHE_BUST=smart-refresh-v6
+ARG CACHE_BUST=task19-debug-v7
 RUN echo "Build ID: ${CACHE_BUST}" > /dev/null \
     && composer dump-autoload --optimize \
     && npm run build \
