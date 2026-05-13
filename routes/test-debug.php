@@ -28,12 +28,6 @@ Route::get('/debug-scraper/{game}', function (\App\Models\Game $game) {
 
 Route::get('/debug-test-scraper/{game}', function (\App\Models\Game $game) {
     try {
-        // Test 1: Simple log
-        \Illuminate\Support\Facades\Log::info('Simple log test');
-        
-        // Test 2: Log with context
-        \Illuminate\Support\Facades\Log::info('Log with context', ['game_id' => $game->id]);
-        
         $scraper = new \App\Services\Scrapers\CheapSharkScraper();
         $result = $scraper->search($game->title);
         
