@@ -14,6 +14,12 @@ Standalone Laravel API service for game price comparison across multiple stores.
 
 ## API Endpoints
 
+### Health check
+```
+GET /api/health
+```
+Returns `{"status": "ok"}` — no API key required. Use this for uptime monitoring.
+
 ### Search all stores
 ```
 GET /api/v1/search?q=elden ring
@@ -68,26 +74,63 @@ X-API-Key: your-api-key-here
 
 Rate limit: 100 requests/hour (configurable via `API_RATE_LIMIT` env var).
 
-## Quick Start
+## Dokploy Deployment
 
-### Docker (recommended)
+### Prerequisites
+- A Dokploy instance with a PostgreSQL database provisioned
+
+### Steps
+
+1. **Create a new application** in Dokploy, pointing to this repository's `/api-service/` directory (or the monorepo root with build context set to `/api-service`).
+
+2. **Set the Dockerfile path** to `api-service/Dockerfile` (if deploying from monorepo root).
+
+3. **Configure environment variables** in Dokploy:
+   ```
+   APP_KEY=base64:your-generated-key
+   APP_ENV=production
+   APP_DEBUG=false
+   APP_URL=https://api.yourdomain.com
+   
+   DB_CONNECTION=pgsql
+   DB_HOST=<dokploy-postgres-host>
+   DB_PORT=5432
+   DB_DATABASE=<database-name>
+   DB_USERNAME=<username>
+   DB_PASSWORD=<password>
+   
+   API_RATE_LIMIT=100
+   API_KEYS=key-one,key-two,key-three
+   ```
+
+4. **Generate an APP_KEY** if needed:
+   ```bash
+   php artisan key:generate --show
+   ```
+
+5. **Deploy** — the container entrypoint will automatically run migrations and start nginx + php-fpm via supervisor.
+
+6. **Set up a health check** in Dokploy pointing to `GET /api/health` (returns `{"status": "ok"}`).
+
+### Docker Compose (local development)
+
 ```bash
 docker compose up -d
-curl http://localhost:8000/api/v1/stores
-```
-
-### Manual
-```bash
-composer install
-cp .env.example .env
-php artisan key:generate
-php artisan serve --port=8000
+curl http://localhost:8000/api/health
+curl -H "X-API-Key: dev-key-change-me-in-production" http://localhost:8000/api/v1/stores
 ```
 
 ## Configuration
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `APP_KEY` | — | Laravel encryption key (required) |
+| `DB_CONNECTION` | `pgsql` | Database driver |
+| `DB_HOST` | `127.0.0.1` | Database host |
+| `DB_PORT` | `5432` | Database port |
+| `DB_DATABASE` | `gameprice_api` | Database name |
+| `DB_USERNAME` | `gameprice` | Database user |
+| `DB_PASSWORD` | `secret` | Database password |
 | `API_RATE_LIMIT` | `100` | Requests per hour |
 | `API_KEYS` | `dev-key-...` | Comma-separated valid API keys |
 
@@ -95,6 +138,7 @@ php artisan serve --port=8000
 
 ### Step 1: Deploy the API
 Deploy this service to any hosting provider:
+- **Dokploy** (recommended, see above)
 - **Railway** / **Render** / **Fly.io** (easiest with Docker)
 - **AWS** (ECS Fargate or EC2)
 - **DigitalOcean** (App Platform with Dockerfile)
@@ -126,14 +170,8 @@ RapidAPI sends requests with the `X-RapidAPI-Proxy-Secret` header. You can:
 
 ### Step 5: Monitoring
 - Use RapidAPI Provider Dashboard for analytics, revenue tracking
-- Monitor your scraper service health independently
+- Monitor your scraper service health independently via `/api/health`
 - Set up alerts for downtime
-
-### Revenue tips
-- Start with a generous free tier to attract subscribers
-- Cache popular game results to reduce scraper load
-- Add a `/api/v1/alerts` endpoint for price drop notifications (future feature)
-- Track which games are searched most to optimize caching
 
 ## Architecture
 
