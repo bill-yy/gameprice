@@ -27,49 +27,26 @@ Route::get('/debug-scraper/{game}', function (\App\Models\Game $game) {
 });
 
 Route::get('/debug-test-scraper/{game}', function (\App\Models\Game $game) {
-    Log::info('testScraper: START', [
-        'game_id' => $game->id,
-        'game_title' => $game->title,
-    ]);
-
     try {
+        // Test 1: Simple log
+        \Illuminate\Support\Facades\Log::info('Simple log test');
+        
+        // Test 2: Log with context
+        \Illuminate\Support\Facades\Log::info('Log with context', ['game_id' => $game->id]);
+        
         $scraper = new \App\Services\Scrapers\CheapSharkScraper();
         $result = $scraper->search($game->title);
-
-        Log::info('testScraper: RESULT', [
-            'game_id' => $game->id,
-            'result' => $result,
-        ]);
-
+        
         return response()->json([
             'success' => true,
-            'game' => [
-                'id' => $game->id,
-                'title' => $game->title,
-                'slug' => $game->slug,
-            ],
-            'scraper' => 'CheapShark',
+            'game_id' => $game->id,
             'result' => $result,
         ]);
     } catch (\Throwable $e) {
-        Log::error('testScraper: FAILED', [
-            'game_id' => $game->id,
-            'exception_class' => get_class($e),
-            'message' => $e->getMessage(),
-            'file' => $e->getFile() . ':' . $e->getLine(),
-            'trace' => $e->getTraceAsString(),
-        ]);
-
         return response()->json([
             'success' => false,
-            'game' => [
-                'id' => $game->id,
-                'title' => $game->title,
-            ],
             'error' => $e->getMessage(),
-            'exception_class' => get_class($e),
             'file' => $e->getFile() . ':' . $e->getLine(),
-            'trace' => config('app.debug') ? $e->getTraceAsString() : null,
         ], 500);
     }
 });
