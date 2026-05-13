@@ -1,5 +1,7 @@
 FROM php:8.4-fpm-alpine
 
+ARG CACHE_BUST=1
+
 RUN apk add --no-cache \
     nginx \
     supervisor \

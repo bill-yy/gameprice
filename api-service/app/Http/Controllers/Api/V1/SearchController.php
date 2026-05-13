@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Services\Scrapers\CDKeysScraper;
 use App\Services\Scrapers\CheapSharkScraper;
 use App\Services\Scrapers\EnebaScraper;
 use App\Services\Scrapers\G2AScraper;
 use App\Services\Scrapers\InstantGamingScraper;
 use App\Services\Scrapers\KinguinScraper;
+use App\Services\Scrapers\PSNStoreScraper;
+use App\Services\Scrapers\XboxStoreScraper;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -19,6 +22,9 @@ class SearchController extends Controller
         'cheapshark' => CheapSharkScraper::class,
         'g2a' => G2AScraper::class,
         'kinguin' => KinguinScraper::class,
+        'cdkeys' => CDKeysScraper::class,
+        'psn-store' => PSNStoreScraper::class,
+        'xbox-store' => XboxStoreScraper::class,
     ];
 
     public function searchAll(Request $request): JsonResponse

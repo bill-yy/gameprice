@@ -76,7 +76,7 @@ class G2AScraper
     private function searchG2A(string $query): array
     {
         $response = Http::withHeaders([
-            'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
             'Accept' => 'application/json',
             'Accept-Language' => 'en-US,en;q=0.9',
             'Referer' => 'https://www.g2a.com/',
@@ -92,9 +92,14 @@ class G2AScraper
         ]);
 
         if (!$response->successful()) {
-            Log::debug('G2A: HTTP ' . $response->status() . ' for query: ' . $query);
             return [];
         }
+
+        Log::info('Scraper g2a: result', [
+            'game' => $query,
+            'http_status' => $response->status(),
+            'response_size' => strlen($response->body()),
+        ]);
 
         $data = $response->json();
 
