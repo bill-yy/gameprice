@@ -44,15 +44,23 @@ class PSNStoreScraper
     private function searchPSN(string $query): array
     {
         $response = Http::withHeaders([
-            'User-Agent' => 'GamePriceBot/1.0 (price comparison service)',
+            'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
             'Accept' => 'application/json',
             'Accept-Language' => 'en-US,en;q=0.9',
-        ])->timeout(5)->get('https://web.np.playstation.com/api/catalog/search', [
+        ])->timeout(10)->get('https://web.np.playstation.com/api/catalog/search', [
             'store' => 'VP9BEPBGVRZC',
             'sort' => 'relevance',
             'game_content_type' => 'games',
             'size' => '10',
             'query' => $query,
+        ]);
+
+        Log::info('Scraper psn-store: result', [
+            'game' => $query,
+            'endpoint' => 'api',
+            'success' => $response->successful(),
+            'http_status' => $response->status(),
+            'response_size' => strlen($response->body()),
         ]);
 
         if (!$response->successful()) {
@@ -69,10 +77,18 @@ class PSNStoreScraper
         $url = 'https://store.playstation.com/es-es/search/' . urlencode($query);
 
         $response = Http::withHeaders([
-            'User-Agent' => 'GamePriceBot/1.0 (price comparison service)',
+            'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
             'Accept' => 'text/html,application/xhtml+xml',
             'Accept-Language' => 'en-US,en;q=0.9',
-        ])->timeout(5)->get($url);
+        ])->timeout(10)->get($url);
+
+        Log::info('Scraper psn-store: result', [
+            'game' => $query,
+            'endpoint' => 'fallback',
+            'success' => $response->successful(),
+            'http_status' => $response->status(),
+            'response_size' => strlen($response->body()),
+        ]);
 
         if (!$response->successful()) {
             return [];

@@ -4,22 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\Game;
 use App\Models\Product;
+use App\Services\DebugScraperService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 
 class DebugScraperController extends Controller
 {
-    private const SCRAPERS = [
-        'cheapshark' => \App\Services\Scrapers\CheapSharkScraper::class,
-        'eneba' => \App\Services\Scrapers\EnebaScraper::class,
-        'instant-gaming' => \App\Services\Scrapers\InstantGamingScraper::class,
-        'g2a' => \App\Services\Scrapers\G2AScraper::class,
-        'kinguin' => \App\Services\Scrapers\KinguinScraper::class,
-        'cdkeys' => \App\Services\Scrapers\CDKeysScraper::class,
-        'psn-store' => \App\Services\Scrapers\PSNStoreScraper::class,
-        'xbox-store' => \App\Services\Scrapers\XboxStoreScraper::class,
-    ];
-
     public function diagnose(Game $game): JsonResponse
     {
         $products = Product::where('game_id', $game->id)
@@ -50,9 +40,17 @@ class DebugScraperController extends Controller
             ],
             'products_count' => $products->count(),
             'products' => $products,
-            'scrapers' => array_keys(self::SCRAPERS),
+            'scrapers' => array_keys(DebugScraperService::SCRAPERS),
             'queue_connection' => config('queue.default'),
             'pending_jobs' => $pendingJobs,
         ]);
+    }
+
+    public function runAllScrapers(Game $game): JsonResponse
+    {
+        $service = new DebugScraperService();
+        $results = $service->diagnose($game->title);
+
+        return response()->json($results);
     }
 }

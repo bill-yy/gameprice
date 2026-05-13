@@ -46,10 +46,17 @@ class CDKeysScraper
         $url = 'https://www.cdkeys.com/catalogsearch/result/?q=' . urlencode($query);
 
         $response = Http::withHeaders([
-            'User-Agent' => 'GamePriceBot/1.0 (price comparison service)',
+            'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
             'Accept' => 'text/html,application/xhtml+xml',
             'Accept-Language' => 'en-US,en;q=0.9',
-        ])->timeout(5)->get($url);
+        ])->timeout(10)->get($url);
+
+        Log::info('Scraper cdkeys: result', [
+            'game' => $query,
+            'success' => $response->successful(),
+            'http_status' => $response->status(),
+            'response_size' => strlen($response->body()),
+        ]);
 
         if (!$response->successful()) {
             return [];

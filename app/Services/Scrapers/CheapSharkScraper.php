@@ -38,7 +38,17 @@ class CheapSharkScraper
     {
         $url = 'https://www.cheapshark.com/api/1.0/deals?title=' . urlencode($query) . '&pageSize=5&sortBy=Price';
 
-        $response = Http::timeout(10)->get($url);
+        $response = Http::withHeaders([
+            'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        ])->timeout(10)->get($url);
+
+        Log::info('Scraper cheapshark: result', [
+            'game' => $query,
+            'endpoint' => 'deals',
+            'success' => $response->successful(),
+            'http_status' => $response->status(),
+            'response_size' => strlen($response->body()),
+        ]);
 
         if (!$response->successful()) {
             return null;
@@ -77,7 +87,17 @@ class CheapSharkScraper
     {
         $url = 'https://www.cheapshark.com/api/1.0/games?title=' . urlencode($query) . '&limit=5';
 
-        $response = Http::timeout(10)->get($url);
+        $response = Http::withHeaders([
+            'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        ])->timeout(10)->get($url);
+
+        Log::info('Scraper cheapshark: result', [
+            'game' => $query,
+            'endpoint' => 'games',
+            'success' => $response->successful(),
+            'http_status' => $response->status(),
+            'response_size' => strlen($response->body()),
+        ]);
 
         if (!$response->successful()) {
             return null;
