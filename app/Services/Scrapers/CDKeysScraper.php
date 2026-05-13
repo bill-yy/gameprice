@@ -49,7 +49,7 @@ class CDKeysScraper
             'User-Agent' => 'GamePriceBot/1.0 (price comparison service)',
             'Accept' => 'text/html,application/xhtml+xml',
             'Accept-Language' => 'en-US,en;q=0.9',
-        ])->timeout(10)->get($url);
+        ])->timeout(5)->get($url);
 
         if (!$response->successful()) {
             return [];

@@ -26,6 +26,8 @@ class FetchPricesForGame implements ShouldQueue
 
     public function __construct(public Game $game) {}
 
+    private const MAX_DURATION_SECONDS = 25;
+
     public function handle(): void
     {
         $scrapers = [
@@ -50,7 +52,19 @@ class FetchPricesForGame implements ShouldQueue
             'xbox-store' => 'Xbox Store',
         ];
 
+        $startTime = microtime(true);
+
         foreach ($scrapers as $slug => $scraperClass) {
+            $elapsed = microtime(true) - $startTime;
+            if ($elapsed >= self::MAX_DURATION_SECONDS) {
+                Log::warning("FetchPricesForGame: time limit reached, skipping remaining scrapers", [
+                    'game_id' => $this->game->id,
+                    'elapsed' => round($elapsed, 1),
+                    'last_scraper' => $slug,
+                ]);
+                break;
+            }
+
             try {
                 $scraper = new $scraperClass;
                 $result = $scraper->search($this->game->title);
@@ -83,14 +97,25 @@ class FetchPricesForGame implements ShouldQueue
                             'in_stock' => $result['in_stock'] ?? true,
                         ],
                     );
+
+                    Log::info("FetchPricesForGame: {$slug} found price for game {$this->game->id}", [
+                        'price' => $result['price_eur'],
+                        'platform' => $platform,
+                    ]);
                 }
             } catch (Throwable $e) {
                 Log::warning("Scraper {$slug} failed for game {$this->game->id}", [
                     'message' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
                 ]);
             }
 
-            usleep(200_000);
+            usleep(100_000);
         }
+
+        $totalElapsed = microtime(true) - $startTime;
+        Log::info("FetchPricesForGame completed for game {$this->game->id}", [
+            'elapsed' => round($totalElapsed, 2) . 's',
+        ]);
     }
 }

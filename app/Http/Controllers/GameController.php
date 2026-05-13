@@ -246,15 +246,28 @@ class GameController extends Controller
     public function refreshPrices(Game $game)
     {
         try {
+            $previousLimit = ini_get('max_execution_time');
+            set_time_limit(60);
+
             Product::where('game_id', $game->id)->where('is_real_price', false)->delete();
 
             FetchPricesForGame::dispatchSync($game);
 
             Cache::forget("games.show.{$game->slug}");
 
+            if ($previousLimit && $previousLimit !== '0') {
+                set_time_limit((int) $previousLimit);
+            }
+
             return back()->with('success', 'Precios actualizados');
         } catch (\Throwable $e) {
-            return back()->with('error', 'Error: ' . $e->getMessage());
+            \Illuminate\Support\Facades\Log::error('refreshPrices failed', [
+                'game_id' => $game->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return back()->with('error', 'Error al actualizar precios. Inténtalo de nuevo.');
         }
     }
 

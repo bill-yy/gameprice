@@ -47,7 +47,7 @@ class PSNStoreScraper
             'User-Agent' => 'GamePriceBot/1.0 (price comparison service)',
             'Accept' => 'application/json',
             'Accept-Language' => 'en-US,en;q=0.9',
-        ])->timeout(10)->get('https://web.np.playstation.com/api/catalog/search', [
+        ])->timeout(5)->get('https://web.np.playstation.com/api/catalog/search', [
             'store' => 'VP9BEPBGVRZC',
             'sort' => 'relevance',
             'game_content_type' => 'games',
@@ -72,7 +72,7 @@ class PSNStoreScraper
             'User-Agent' => 'GamePriceBot/1.0 (price comparison service)',
             'Accept' => 'text/html,application/xhtml+xml',
             'Accept-Language' => 'en-US,en;q=0.9',
-        ])->timeout(10)->get($url);
+        ])->timeout(5)->get($url);
 
         if (!$response->successful()) {
             return [];

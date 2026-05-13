@@ -48,7 +48,7 @@ class XboxStoreScraper
             'Accept' => 'application/json',
             'Accept-Language' => 'en-US,en;q=0.9',
             'MS-CV' => bin2hex(random_bytes(16)),
-        ])->timeout(10)->get('https://displaycatalog.mp.microsoft.com/v7.0/products', [
+        ])->timeout(5)->get('https://displaycatalog.mp.microsoft.com/v7.0/products', [
             'market' => 'ES',
             'languages' => 'en-US',
             'bigIds' => '',
@@ -73,7 +73,7 @@ class XboxStoreScraper
             'User-Agent' => 'GamePriceBot/1.0 (price comparison service)',
             'Accept' => 'text/html,application/xhtml+xml',
             'Accept-Language' => 'en-US,en;q=0.9',
-        ])->timeout(10)->get($url);
+        ])->timeout(5)->get($url);
 
         if (!$response->successful()) {
             return [];
