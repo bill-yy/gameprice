@@ -66,7 +66,7 @@ class DebugScraperController extends Controller
             ->with('store:id,name,slug')
             ->get()
             ->map(fn ($p) => [
-                'store' => $p->store->name ?? $p->store->slug,
+                'store' => $p->store?->name ?? $p->store?->slug ?? 'Unknown',
                 'platform' => $p->platform,
                 'price' => $p->current_price,
                 'url' => $p->url,
