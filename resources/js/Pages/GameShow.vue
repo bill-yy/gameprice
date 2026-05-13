@@ -131,7 +131,7 @@ const hoursSinceUpdate = computed(() => {
 });
 
 const freshnessBadge = computed(() => {
-    if (hoursSinceUpdate.value === null) return { text: 'Sin precios reales', color: 'gray' };
+    if (hoursSinceUpdate.value === null) return null;
     if (hoursSinceUpdate.value < 1) return { text: '✅ Precios actualizados hace poco', color: 'green' };
     if (hoursSinceUpdate.value <= 24) return { text: `✅ Precios actualizados hace ${hoursSinceUpdate.value}h`, color: 'green' };
     return { text: `⚠ Precios de hace ${hoursSinceUpdate.value}h`, color: 'yellow' };
