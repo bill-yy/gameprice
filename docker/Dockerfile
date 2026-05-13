@@ -51,7 +51,7 @@ COPY . .
 
 # Build de assets y optimización
 # ARG must be consumed in a RUN to bust Docker cache
-ARG CACHE_BUST=smart-refresh-v3
+ARG CACHE_BUST=smart-refresh-v4
 RUN echo "Build ID: ${CACHE_BUST}" > /dev/null \
     && composer dump-autoload --optimize \
     && npm run build \
