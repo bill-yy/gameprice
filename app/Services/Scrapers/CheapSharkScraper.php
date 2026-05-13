@@ -10,42 +10,13 @@ class CheapSharkScraper
     public function search(string $query): ?array
     {
         try {
-            $url = 'https://www.cheapshark.com/api/1.0/deals?title=' . urlencode($query) . '&pageSize=5&sortBy=Price';
+            $result = $this->searchDeals($query);
 
-            $response = Http::timeout(10)->get($url);
-
-            if (!$response->successful()) {
-                return null;
+            if ($result === null) {
+                $result = $this->searchGames($query);
             }
 
-            $deals = $response->json();
-
-            if (!is_array($deals) || empty($deals)) {
-                return null;
-            }
-
-            $bestMatch = $this->findBestMatch($deals, $query);
-
-            if (!$bestMatch) {
-                return null;
-            }
-
-            $normalPrice = (float) ($bestMatch['normalPrice'] ?? 0);
-            $salePrice = (float) ($bestMatch['salePrice'] ?? 0);
-            $discount = (int) ($bestMatch['savings'] ?? 0);
-
-            $steamAppId = $bestMatch['steamAppID'] ?? null;
-            $dealId = $bestMatch['dealID'] ?? null;
-            $dealUrl = $dealId ? "https://www.cheapshark.com/redirect?dealID={$dealId}" : '';
-
-            return [
-                'name' => $bestMatch['title'] ?? null,
-                'price_eur' => $salePrice,
-                'original_price_eur' => $normalPrice,
-                'discount_percent' => $discount,
-                'url' => $dealUrl,
-                'in_stock' => $salePrice > 0,
-            ];
+            return $result;
         } catch (\Throwable $e) {
             Log::warning('CheapShark scraper failed', [
                 'query' => $query,
@@ -54,6 +25,81 @@ class CheapSharkScraper
 
             return null;
         }
+    }
+
+    private function searchDeals(string $query): ?array
+    {
+        $url = 'https://www.cheapshark.com/api/1.0/deals?title=' . urlencode($query) . '&pageSize=5&sortBy=Price';
+
+        $response = Http::timeout(10)->get($url);
+
+        if (!$response->successful()) {
+            return null;
+        }
+
+        $deals = $response->json();
+
+        if (!is_array($deals) || empty($deals)) {
+            return null;
+        }
+
+        $bestMatch = $this->findBestMatch($deals, $query);
+
+        if (!$bestMatch) {
+            return null;
+        }
+
+        $normalPrice = (float) ($bestMatch['normalPrice'] ?? 0);
+        $salePrice = (float) ($bestMatch['salePrice'] ?? 0);
+        $discount = (int) ($bestMatch['savings'] ?? 0);
+
+        $dealId = $bestMatch['dealID'] ?? null;
+        $dealUrl = $dealId ? "https://www.cheapshark.com/redirect?dealID={$dealId}" : '';
+
+        return [
+            'name' => $bestMatch['title'] ?? null,
+            'price_eur' => $salePrice,
+            'original_price_eur' => $normalPrice,
+            'discount_percent' => $discount,
+            'url' => $dealUrl,
+            'in_stock' => $salePrice > 0,
+        ];
+    }
+
+    private function searchGames(string $query): ?array
+    {
+        $url = 'https://www.cheapshark.com/api/1.0/games?title=' . urlencode($query) . '&limit=5';
+
+        $response = Http::timeout(10)->get($url);
+
+        if (!$response->successful()) {
+            return null;
+        }
+
+        $games = $response->json();
+
+        if (!is_array($games) || empty($games)) {
+            return null;
+        }
+
+        $bestMatch = $this->findBestMatchFromGames($games, $query);
+
+        if (!$bestMatch) {
+            return null;
+        }
+
+        $cheapest = (float) ($bestMatch['cheapest'] ?? 0);
+        $dealId = $bestMatch['cheapestDealID'] ?? null;
+        $dealUrl = $dealId ? "https://www.cheapshark.com/redirect?dealID={$dealId}" : '';
+
+        return [
+            'name' => $bestMatch['external'] ?? null,
+            'price_eur' => $cheapest,
+            'original_price_eur' => $cheapest,
+            'discount_percent' => 0,
+            'url' => $dealUrl,
+            'in_stock' => $cheapest > 0,
+        ];
     }
 
     private function findBestMatch(array $deals, string $query): ?array
@@ -83,5 +129,29 @@ class CheapSharkScraper
         });
 
         return $deals[0] ?? null;
+    }
+
+    private function findBestMatchFromGames(array $games, string $query): ?array
+    {
+        usort($games, function ($a, $b) use ($query) {
+            $aScore = 0;
+            $bScore = 0;
+
+            similar_text(strtolower($a['external'] ?? ''), strtolower($query), $aSim);
+            similar_text(strtolower($b['external'] ?? ''), strtolower($query), $bSim);
+            $aScore += $aSim;
+            $bScore += $bSim;
+
+            if (stripos($a['external'] ?? '', $query) !== false) {
+                $aScore += 20;
+            }
+            if (stripos($b['external'] ?? '', $query) !== false) {
+                $bScore += 20;
+            }
+
+            return $bScore <=> $aScore;
+        });
+
+        return $games[0] ?? null;
     }
 }

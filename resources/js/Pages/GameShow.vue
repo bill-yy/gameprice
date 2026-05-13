@@ -121,6 +121,9 @@ const refreshing = ref(false);
 const refreshPrices = () => {
     refreshing.value = true;
     router.post(route('game.refresh-prices', props.game.slug), {}, {
+        onSuccess: () => {
+            router.reload({ only: ['products', 'priceHistories', 'vouchers'] });
+        },
         onFinish: () => {
             refreshing.value = false;
         },

@@ -31,9 +31,9 @@ class FetchPricesForGame implements ShouldQueue
     public function handle(): void
     {
         $scrapers = [
+            'cheapshark' => CheapSharkScraper::class,
             'eneba' => EnebaScraper::class,
             'instant-gaming' => InstantGamingScraper::class,
-            'cheapshark' => CheapSharkScraper::class,
             'g2a' => G2AScraper::class,
             'kinguin' => KinguinScraper::class,
             'cdkeys' => CDKeysScraper::class,
@@ -42,9 +42,9 @@ class FetchPricesForGame implements ShouldQueue
         ];
 
         $storeNames = [
+            'cheapshark' => 'CheapShark',
             'eneba' => 'Eneba',
             'instant-gaming' => 'Instant Gaming',
-            'cheapshark' => 'CheapShark',
             'g2a' => 'G2A',
             'kinguin' => 'Kinguin',
             'cdkeys' => 'CDKeys',
