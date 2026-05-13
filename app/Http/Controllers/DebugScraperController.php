@@ -20,7 +20,7 @@ class DebugScraperController extends Controller
                 'platform' => $p->platform,
                 'price' => $p->current_price,
                 'is_real_price' => $p->is_real_price,
-                'price_fetched_at' => $p->price_fetched_at?->toIso8601String(),
+                'price_fetched_at' => $p->price_fetched_at,
             ]);
 
         $pendingJobs = 0;
