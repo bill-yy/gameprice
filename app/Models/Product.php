@@ -23,6 +23,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'is_real_price',
     'currency',
     'in_stock',
+    'price_fetched_at',
 ])]
 class Product extends Model
 {
