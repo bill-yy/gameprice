@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\DebugScraperController;
 use App\Http\Controllers\GameController;
 use App\Http\Controllers\GenreController;
 use App\Http\Controllers\PriceAlertController;
@@ -17,6 +18,7 @@ Route::post('/search/steam', [GameController::class, 'searchOnDemand'])->name('s
 Route::get('/juego/{game}', [GameController::class, 'show'])->name('game.show');
 Route::post('/juego/{game}/refresh-prices', [GameController::class, 'refreshPrices'])->name('game.refresh-prices');
 Route::get('/test-scraper/{game}', [GameController::class, 'testScraper'])->name('game.test-scraper');
+Route::get('/debug/scrapers/{game:slug}', [DebugScraperController::class, 'diagnose']);
 Route::get('/categoria/{genre}', [GenreController::class, 'show'])->name('genre.show');
 Route::get('/sitemap.xml', [SitemapController::class, 'index'])->name('sitemap');
 
