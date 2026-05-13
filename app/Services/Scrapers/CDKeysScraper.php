@@ -7,6 +7,37 @@ use Illuminate\Support\Facades\Log;
 
 class CDKeysScraper
 {
+    public static function getStoreName(): string
+    {
+        return 'CDKeys';
+    }
+
+    public function searchAll(string $query): array
+    {
+        try {
+            $results = $this->searchCDKeys($query);
+
+            return array_map(fn ($r) => [
+                'store' => self::getStoreName(),
+                'name' => $r['name'],
+                'price' => $r['price_eur'],
+                'original_price' => $r['original_price_eur'],
+                'discount_percent' => $r['discount_percent'],
+                'currency' => 'EUR',
+                'url' => $r['url'],
+                'in_stock' => $r['in_stock'],
+                'platform' => $r['platform'] ?? 'PC',
+            ], $results);
+        } catch (\Throwable $e) {
+            Log::warning('CDKeys scraper failed', [
+                'query' => $query,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
     public function search(string $query): ?array
     {
         try {

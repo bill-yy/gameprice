@@ -7,6 +7,38 @@ use Illuminate\Support\Facades\Log;
 
 class KinguinScraper
 {
+    public static function getStoreName(): string
+    {
+        return 'Kinguin';
+    }
+
+    public function searchAll(string $query): array
+    {
+        try {
+            $results = $this->searchKinguin($query);
+
+            return array_map(fn ($r) => [
+                'store' => self::getStoreName(),
+                'name' => $r['name'],
+                'price' => $r['price_eur'],
+                'original_price' => $r['original_price_eur'],
+                'discount_percent' => $r['discount_percent'],
+                'currency' => 'EUR',
+                'url' => $r['url'],
+                'in_stock' => $r['in_stock'],
+                'platform' => 'PC',
+                'region' => $r['region'] ?? 'global',
+            ], $results);
+        } catch (\Throwable $e) {
+            Log::warning('Kinguin scraper failed', [
+                'query' => $query,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
     public function search(string $query): ?array
     {
         try {

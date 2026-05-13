@@ -9,6 +9,65 @@ class CheapSharkScraper
 {
     private const USD_TO_EUR = 0.92;
 
+    public static function getStoreName(): string
+    {
+        return 'CheapShark';
+    }
+
+    public function searchAll(string $query): array
+    {
+        try {
+            $url = 'https://www.cheapshark.com/api/1.0/deals?title=' . urlencode($query) . '&pageSize=20&sortBy=Price';
+
+            $response = Http::withHeaders([
+                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+            ])->timeout(10)->get($url);
+
+            Log::info('Scraper cheapshark: result', [
+                'game' => $query,
+                'http_status' => $response->status(),
+                'response_size' => strlen($response->body()),
+            ]);
+
+            if (!$response->successful()) {
+                return [];
+            }
+
+            $deals = $response->json();
+
+            if (!is_array($deals)) {
+                return [];
+            }
+
+            return array_map(function ($deal) {
+                $salePrice = (float) ($deal['salePrice'] ?? 0);
+                $normalPrice = (float) ($deal['normalPrice'] ?? 0);
+                $dealId = $deal['dealID'] ?? null;
+
+                return [
+                    'store' => self::getStoreName(),
+                    'name' => $deal['title'] ?? '',
+                    'price' => $salePrice,
+                    'original_price' => $normalPrice,
+                    'discount_percent' => (int) ($deal['savings'] ?? 0),
+                    'currency' => 'USD',
+                    'url' => $dealId ? "https://www.cheapshark.com/redirect?dealID={$dealId}" : '',
+                    'in_stock' => $salePrice > 0,
+                    'platform' => 'PC',
+                    'steam_rating' => (float) ($deal['steamRatingPercent'] ?? 0),
+                    'metacritic_score' => (int) ($deal['metacriticScore'] ?? 0),
+                ];
+            }, $deals);
+        } catch (\Throwable $e) {
+            Log::warning('CheapShark scraper failed', [
+                'query' => $query,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
     private function usdToEur(float $usd): float
     {
         return round($usd * self::USD_TO_EUR, 2);

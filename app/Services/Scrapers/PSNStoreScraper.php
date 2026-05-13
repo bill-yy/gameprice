@@ -7,6 +7,37 @@ use Illuminate\Support\Facades\Log;
 
 class PSNStoreScraper
 {
+    public static function getStoreName(): string
+    {
+        return 'PSN Store';
+    }
+
+    public function searchAll(string $query): array
+    {
+        try {
+            $results = $this->searchPSN($query);
+
+            return array_map(fn ($r) => [
+                'store' => self::getStoreName(),
+                'name' => $r['name'],
+                'price' => $r['price_eur'],
+                'original_price' => $r['original_price_eur'],
+                'discount_percent' => $r['discount_percent'],
+                'currency' => 'EUR',
+                'url' => $r['url'],
+                'in_stock' => $r['in_stock'],
+                'platform' => $r['platform'] ?? 'PS5',
+            ], $results);
+        } catch (\Throwable $e) {
+            Log::warning('PSN Store scraper failed', [
+                'query' => $query,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
     public function search(string $query): ?array
     {
         try {
