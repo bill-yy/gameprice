@@ -1,5 +1,5 @@
 <script setup>
-import { Head, Link, useForm, usePage, router } from '@inertiajs/vue3';
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import Breadcrumbs from '@/Components/Breadcrumbs.vue';
 import ReviewList from '@/Components/ReviewList.vue';
@@ -116,19 +116,26 @@ const storeStars = (rating) => {
 
 const copiedCode = ref('');
 
-const refreshing = ref(false);
+const lastPriceUpdate = computed(() => {
+    if (!props.products?.length) return null;
+    const dates = props.products
+        .map(p => p.price_fetched_at ? new Date(p.price_fetched_at) : null)
+        .filter(Boolean);
+    if (!dates.length) return null;
+    return new Date(Math.max(...dates));
+});
 
-const refreshPrices = () => {
-    refreshing.value = true;
-    router.post(route('game.refresh-prices', props.game.slug), {}, {
-        onSuccess: () => {
-            router.reload({ only: ['products', 'priceHistories', 'vouchers'] });
-        },
-        onFinish: () => {
-            refreshing.value = false;
-        },
-    });
-};
+const hoursSinceUpdate = computed(() => {
+    if (!lastPriceUpdate.value) return null;
+    return Math.floor((Date.now() - lastPriceUpdate.value.getTime()) / (1000 * 60 * 60));
+});
+
+const freshnessBadge = computed(() => {
+    if (hoursSinceUpdate.value === null) return { text: 'Sin precios reales', color: 'gray' };
+    if (hoursSinceUpdate.value < 1) return { text: '✅ Precios actualizados hace poco', color: 'green' };
+    if (hoursSinceUpdate.value <= 24) return { text: `✅ Precios actualizados hace ${hoursSinceUpdate.value}h`, color: 'green' };
+    return { text: `⚠ Precios de hace ${hoursSinceUpdate.value}h`, color: 'yellow' };
+});
 
 const getStoreVoucher = (storeId) => {
     return props.vouchers[storeId] || null;
@@ -331,7 +338,18 @@ const chartData = computed(() => {
             </div>
 
             <div class="mt-10">
-                <h2 class="mb-4 text-2xl font-bold">Comparar precios</h2>
+                <div class="mb-4 flex items-center gap-3">
+                    <h2 class="text-2xl font-bold">Comparar precios</h2>
+                    <span
+                        v-if="freshnessBadge"
+                        class="text-xs font-medium"
+                        :class="{
+                            'text-green-600': freshnessBadge.color === 'green',
+                            'text-yellow-600': freshnessBadge.color === 'yellow',
+                            'text-gray-500': freshnessBadge.color === 'gray',
+                        }"
+                    >{{ freshnessBadge.text }}</span>
+                </div>
 
                 <div v-if="products.some(p => p.is_real_price)" class="overflow-x-auto rounded-lg border border-gray-700">
                     <table class="w-full min-w-[640px] text-left text-sm">
@@ -453,13 +471,6 @@ const chartData = computed(() => {
 
                 <p v-else class="rounded-lg bg-gray-800 p-8 text-center text-gray-400">
                     {{ products.length > 0 ? 'No hay precios reales disponibles para este juego.' : 'No hay precios disponibles para este juego.' }}
-                    <button
-                        @click="refreshPrices"
-                        :disabled="refreshing"
-                        class="mt-4 inline-block rounded-lg bg-blue-600 px-6 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
-                    >
-                        {{ refreshing ? 'Actualizando...' : '🔄 Actualizar precios' }}
-                    </button>
                 </p>
             </div>
 
