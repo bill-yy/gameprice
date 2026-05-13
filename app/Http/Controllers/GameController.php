@@ -251,7 +251,8 @@ class GameController extends Controller
 
             Product::where('game_id', $game->id)->where('is_real_price', false)->delete();
 
-            FetchPricesForGame::dispatchSync($game);
+            $job = new FetchPricesForGame($game);
+            $job->handle();
 
             Cache::forget("games.show.{$game->slug}");
 
