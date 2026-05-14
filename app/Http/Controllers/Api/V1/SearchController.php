@@ -142,7 +142,7 @@ class SearchController extends Controller
 
     public function deals(): JsonResponse
     {
-        $cacheKey = 'api.deals';
+        $cacheKey = 'api.deals.v2';
         $cached = Cache::get($cacheKey);
 
         try {
