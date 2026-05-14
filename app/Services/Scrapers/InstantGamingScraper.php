@@ -81,7 +81,7 @@ class InstantGamingScraper
             'Accept-Language' => 'en-US,en;q=0.9',
             'Accept-Encoding' => 'gzip, deflate',
             'Referer' => 'https://www.instant-gaming.com/',
-        ])->timeout(10)->get($url);
+        ])->timeout(5)->get($url);
 
         Log::info('Scraper instant-gaming: result', [
             'game' => $query,

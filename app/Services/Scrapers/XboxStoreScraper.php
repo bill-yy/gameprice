@@ -79,7 +79,7 @@ class XboxStoreScraper
             'Accept' => 'application/json',
             'Accept-Language' => 'en-US,en;q=0.9',
             'MS-CV' => bin2hex(random_bytes(16)),
-        ])->timeout(10)->get('https://displaycatalog.mp.microsoft.com/v7.0/products', [
+        ])->timeout(5)->get('https://displaycatalog.mp.microsoft.com/v7.0/products', [
             'market' => 'ES',
             'languages' => 'en-US',
             'bigIds' => '',
@@ -112,7 +112,7 @@ class XboxStoreScraper
             'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
             'Accept' => 'text/html,application/xhtml+xml',
             'Accept-Language' => 'en-US,en;q=0.9',
-        ])->timeout(10)->get($url);
+        ])->timeout(5)->get($url);
 
         Log::info('Scraper xbox-store: result', [
             'game' => $query,

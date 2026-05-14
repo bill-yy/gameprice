@@ -78,7 +78,7 @@ class PSNStoreScraper
             'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
             'Accept' => 'application/json',
             'Accept-Language' => 'en-US,en;q=0.9',
-        ])->timeout(10)->get('https://web.np.playstation.com/api/catalog/search', [
+        ])->timeout(5)->get('https://web.np.playstation.com/api/catalog/search', [
             'store' => 'VP9BEPBGVRZC',
             'sort' => 'relevance',
             'game_content_type' => 'games',
@@ -111,7 +111,7 @@ class PSNStoreScraper
             'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
             'Accept' => 'text/html,application/xhtml+xml',
             'Accept-Language' => 'en-US,en;q=0.9',
-        ])->timeout(10)->get($url);
+        ])->timeout(5)->get($url);
 
         Log::info('Scraper psn-store: result', [
             'game' => $query,

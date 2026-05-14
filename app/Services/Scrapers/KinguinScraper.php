@@ -81,7 +81,7 @@ class KinguinScraper
             'Accept-Language' => 'en-US,en;q=0.9',
             'Referer' => 'https://www.kinguin.net/',
             'Origin' => 'https://www.kinguin.net',
-        ])->timeout(10)->get('https://www.kinguin.net/svc/search/api/v1/products', [
+        ])->timeout(5)->get('https://www.kinguin.net/svc/search/api/v1/products', [
             'q' => $query,
             'limit' => 24,
             'sort' => 'score',
