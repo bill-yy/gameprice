@@ -21,7 +21,18 @@ class ApiKeySeeder extends Seeder
             ]
         );
 
-        // Demo keys for each plan (for testing)
+        // Admin key
+        ApiKey::firstOrCreate(
+            ['key' => hash('sha256', 'admin-dashboard-key')],
+            [
+                'name' => 'Admin Dashboard',
+                'plan' => 'ultra',
+                'requests_limit_daily' => 0,
+                'rate_limit_per_minute' => 300,
+                'is_active' => true,
+            ]
+        );
+
         $plans = ['free', 'basic', 'pro', 'ultra'];
         foreach ($plans as $plan) {
             ApiKey::firstOrCreate(
