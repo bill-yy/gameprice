@@ -15,7 +15,7 @@ RUN apk add --no-cache \
     nodejs \
     npm
 
-# Instalar extensiones PHP
+# Instalar extensiones PHP + Redis
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) \
     pdo_pgsql \
@@ -27,7 +27,11 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
     bcmath \
     intl \
     gd \
-    opcache
+    opcache \
+    && apk add --no-cache --virtual .build-deps $PHPIZE_DEPS \
+    && pecl install redis \
+    && docker-php-ext-enable redis \
+    && apk del .build-deps
 
 # Configurar OPcache para producción
 COPY docker/opcache.ini /usr/local/etc/php/conf.d/opcache.ini
