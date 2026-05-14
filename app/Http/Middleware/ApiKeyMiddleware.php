@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\ApiKey;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -10,21 +11,12 @@ class ApiKeyMiddleware
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $validKeys = config('api.keys', []);
-
         // En local, permitir bypass si no hay keys reales configuradas
         if (app()->environment('local')) {
+            $validKeys = config('api.keys', []);
             if (empty($validKeys) || (count($validKeys) === 1 && $validKeys[0] === 'dev-key-change-me-in-production')) {
                 return $next($request);
             }
-        }
-
-        // En producción (y local con keys configuradas), siempre requerir key
-        if (empty($validKeys)) {
-            return response()->json([
-                'success' => false,
-                'error' => 'API authentication not configured.',
-            ], 401);
         }
 
         $apiKey = $request->header('X-API-Key');
@@ -36,12 +28,24 @@ class ApiKeyMiddleware
             ], 401);
         }
 
-        if (! in_array($apiKey, $validKeys, true)) {
+        $keyRecord = ApiKey::where('key', $apiKey)->where('is_active', true)->first();
+
+        if (! $keyRecord) {
             return response()->json([
                 'success' => false,
-                'error' => 'Invalid API key.',
+                'error' => 'Invalid or revoked API key.',
             ], 401);
         }
+
+        if ($keyRecord->expires_at && $keyRecord->expires_at->isPast()) {
+            return response()->json([
+                'success' => false,
+                'error' => 'API key has expired.',
+            ], 401);
+        }
+
+        // Attach key record to request for downstream middleware/controllers
+        $request->attributes->set('api_key_record', $keyRecord);
 
         return $next($request);
     }

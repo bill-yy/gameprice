@@ -26,4 +26,5 @@ Schedule::command('kinguin:scrape --limit=50')->dailyAt('07:30');
 Schedule::command('kinguin:import-json')->dailyAt('08:00');
 Schedule::command('gamesplanet:scrape --limit=50')->dailyAt('08:30');
 Schedule::command('gamesplanet:import-json')->dailyAt('09:00');
+Schedule::call(fn () => \App\Models\ApiKey::resetDailyCounters())->dailyAt('00:00');
 // Schedule::command('prices:scrape-cheapshark --pages=10')->everyThreeHours(); // disabled: rate-limited from container

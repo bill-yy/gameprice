@@ -28,6 +28,7 @@ php artisan gamesplanet:import-json || true
 
 # Seed vouchers
 php artisan db:seed --class=VoucherSeeder --force || true
+php artisan db:seed --class=ApiKeySeeder --force || true
 
 # Fix storage permissions for logs and caches
 chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
