@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\SearchController;
 use App\Http\Controllers\Api\V1\StoreController;
 use App\Http\Controllers\Api\V1\WebhookController;
 use App\Http\Controllers\Api\V1\LandingController;
+use App\Http\Controllers\Api\V1\GameController as ApiGameController;
 use App\Http\Controllers\Api\V1\Admin\ApiDashboardController;
 
 Route::get('/health', function () {
@@ -40,6 +41,12 @@ Route::prefix('v1')->group(function () {
     Route::get('/prices/{store}', [SearchController::class, 'searchByStore']);
     Route::get('/stores', [StoreController::class, 'index']);
     Route::get('/deals', [SearchController::class, 'deals']);
+
+    // Game catalog (database-backed)
+    Route::get('/games', [ApiGameController::class, 'index']);
+    Route::get('/games/{slug}', [ApiGameController::class, 'show']);
+    Route::get('/games/{slug}/prices', [ApiGameController::class, 'prices']);
+    Route::post('/games/{slug}/refresh', [ApiGameController::class, 'refreshPrices']);
 
     // Webhooks (Pro/Ultra only)
     Route::get('/webhooks', [WebhookController::class, 'index']);
