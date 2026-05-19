@@ -72,9 +72,24 @@ class SearchController extends Controller
 
             usort($allResults, fn ($a, $b) => ($a['price'] ?? PHP_FLOAT_MAX) <=> ($b['price'] ?? PHP_FLOAT_MAX));
 
+            // Get suggestions if very few results
+            $suggestions = [];
+            if (count($allResults) < 3) {
+                try {
+                    $aksScraper = new AllKeyShopScraper();
+                    $suggestions = $aksScraper->getSuggestions($query);
+                } catch (\Throwable $e) {
+                    Log::warning('Failed to get search suggestions', [
+                        'query' => $query,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+
             return [
                 'allResults' => array_values($allResults),
                 'storesSearched' => $storesSearched,
+                'suggestions' => $suggestions,
             ];
         });
 
@@ -82,6 +97,7 @@ class SearchController extends Controller
             'success' => true,
             'query' => $query,
             'results' => $result['allResults'],
+            'suggestions' => $result['suggestions'] ?? [],
             'meta' => [
                 'count' => count($result['allResults']),
                 'stores_searched' => $result['storesSearched'],
@@ -127,6 +143,7 @@ class SearchController extends Controller
                 'query' => $query,
                 'error' => 'Scraper failed: ' . $e->getMessage(),
                 'results' => [],
+                'suggestions' => [],
                 'meta' => ['count' => 0, 'stores_searched' => 1],
             ], 500);
         }
@@ -134,11 +151,26 @@ class SearchController extends Controller
         // Filtrar precios 0
         $results = array_filter($results, fn ($r) => ($r['price'] ?? 0) > 0);
 
+        // Get suggestions if very few results
+        $suggestions = [];
+        if (count($results) < 3) {
+            try {
+                $aksScraper = new AllKeyShopScraper();
+                $suggestions = $aksScraper->getSuggestions($query);
+            } catch (\Throwable $e) {
+                Log::warning('Failed to get search suggestions', [
+                    'query' => $query,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
         return response()->json([
             'success' => true,
             'query' => $query,
             'store' => $store,
             'results' => array_values($results),
+            'suggestions' => $suggestions,
             'meta' => [
                 'count' => count($results),
                 'stores_searched' => 1,

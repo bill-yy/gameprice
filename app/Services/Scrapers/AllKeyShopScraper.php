@@ -461,4 +461,172 @@ class AllKeyShopScraper
         
         return $mapping[$seller] ?? $seller;
     }
+
+    /**
+     * Get game title suggestions from AllKeyShop search page
+     */
+    public function getSuggestions(string $query): array
+    {
+        try {
+            $searchHtml = $this->fetchSearchPage($query);
+            if (! $searchHtml) {
+                return [];
+            }
+
+            return $this->extractSuggestionsFromSearchHtml($searchHtml, $query);
+        } catch (\Throwable $e) {
+            Log::warning('AllKeyShop suggestions failed', [
+                'query' => $query,
+                'error' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+    }
+
+    /**
+     * Extract suggestion titles and slugs from AllKeyShop search HTML
+     */
+    private function extractSuggestionsFromSearchHtml(string $html, string $query): array
+    {
+        $suggestions = [];
+
+        // Strategy 1: Look for <a> tags with product URLs, capture title attribute or text
+        if (preg_match_all(
+            '/<a[^>]+href="(https?:\/\/www\.allkeyshop\.com\/blog\/buy-[^"]+-cd-key-compare-prices\/[^"]*)"[^>]*(?:title="([^"]*)")?[^>]*>(.*?)<\/a>/is',
+            $html,
+            $matches,
+            PREG_SET_ORDER
+        )) {
+            foreach ($matches as $match) {
+                $link = $match[1];
+                $titleAttr = html_entity_decode(trim($match[2] ?? ''), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                $innerText = html_entity_decode(strip_tags(trim($match[3] ?? '')), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+                // Prefer title attribute if meaningful
+                $rawTitle = $titleAttr;
+                if (strlen($rawTitle) < 2) {
+                    $rawTitle = $innerText;
+                }
+
+                if (strlen($rawTitle) < 2) {
+                    continue;
+                }
+
+                // Skip generic link texts
+                $generic = ['compare prices', 'buy', 'more', 'details', 'view'];
+                if (in_array(strtolower($rawTitle), $generic, true)) {
+                    continue;
+                }
+
+                $slug = '';
+                if (preg_match('/buy-(.+)-cd-key-compare-prices/', $link, $m)) {
+                    $slug = $m[1];
+                }
+
+                if (! $slug) {
+                    continue;
+                }
+
+                $suggestions[$slug] = [
+                    'title' => $rawTitle,
+                    'slug' => $slug,
+                ];
+            }
+        }
+
+        // Strategy 2: If no titles found, extract from links and derive titles from slugs
+        if (empty($suggestions)) {
+            preg_match_all('/href="(https?:\/\/www\.allkeyshop\.com\/blog\/buy-[^"]+-cd-key-compare-prices\/[^"]*)"/', $html, $matches);
+            $links = array_unique($matches[1] ?? []);
+
+            foreach ($links as $link) {
+                $slug = '';
+                if (preg_match('/buy-(.+)-cd-key-compare-prices/', $link, $m)) {
+                    $slug = $m[1];
+                }
+
+                if (! $slug || isset($suggestions[$slug])) {
+                    continue;
+                }
+
+                $title = str_replace('-', ' ', $slug);
+                $title = ucwords($title);
+
+                $suggestions[$slug] = [
+                    'title' => $title,
+                    'slug' => $slug,
+                ];
+            }
+        }
+
+        // Score and sort by relevance, normalize confidence
+        $scored = $this->scoreSuggestions(array_values($suggestions), $query);
+
+        // Return top 5
+        return array_slice($scored, 0, 5);
+    }
+
+    /**
+     * Score suggestions by relevance to the query
+     */
+    private function scoreSuggestions(array $suggestions, string $query): array
+    {
+        $queryWords = array_filter(explode(' ', strtolower(preg_replace('/[^a-z0-9\s]/', '', $query))));
+        $scored = [];
+
+        foreach ($suggestions as $suggestion) {
+            $titleLower = strtolower($suggestion['title']);
+            $slugLower = strtolower(str_replace('-', ' ', $suggestion['slug']));
+            $score = 0;
+
+            foreach ($queryWords as $word) {
+                if (strlen($word) <= 2) {
+                    continue;
+                }
+
+                // Exact word match in title or slug
+                if (strpos($titleLower, $word) !== false || strpos($slugLower, $word) !== false) {
+                    $score += 10;
+                }
+
+                // Partial match using similar_text
+                similar_text($word, $titleLower, $percent);
+                if ($percent > 70) {
+                    $score += 5;
+                }
+            }
+
+            // Bonus for exact query match
+            $queryLower = strtolower($query);
+            if (strpos($titleLower, $queryLower) !== false || strpos($slugLower, $queryLower) !== false) {
+                $score += 50;
+            }
+
+            // Bonus for title starting with query
+            if (strpos($titleLower, $queryLower) === 0 || strpos($slugLower, $queryLower) === 0) {
+                $score += 20;
+            }
+
+            // Penalize extra unrelated words
+            $titleWords = array_filter(explode(' ', $titleLower));
+            foreach ($titleWords as $word) {
+                if (strlen($word) > 3 && ! in_array($word, $queryWords)) {
+                    $score -= 1;
+                }
+            }
+
+            $confidence = min(1.0, max(0, $score) / 100);
+
+            $scored[] = [
+                'title' => $suggestion['title'],
+                'slug' => $suggestion['slug'],
+                'confidence' => round($confidence, 2),
+            ];
+        }
+
+        usort($scored, fn ($a, $b) => $b['confidence'] <=> $a['confidence']);
+
+        return $scored;
+    }
 }
