@@ -21,6 +21,18 @@ use Illuminate\Support\Facades\Log;
 
 class SearchController extends Controller
 {
+    // Stores that actively return prices (used in searchAll)
+    private const ACTIVE_SCRAPERS = [
+        'eneba' => EnebaScraper::class,
+        'instant-gaming' => InstantGamingScraper::class,
+        'cheapshark' => CheapSharkScraper::class,
+        'gamesplanet' => GamesplanetScraper::class,
+        'allkeyshop' => AllKeyShopScraper::class,
+        'psn-store' => PSNStoreScraper::class,
+        'xbox-store' => XboxStoreScraper::class,
+    ];
+
+    // All stores including ones covered indirectly by AllKeyShop
     private const SCRAPERS = [
         'eneba' => EnebaScraper::class,
         'instant-gaming' => InstantGamingScraper::class,
@@ -52,14 +64,30 @@ class SearchController extends Controller
         $result = Cache::remember($cacheKey, now()->addMinutes(30), function () use ($query) {
             $allResults = [];
             $storesSearched = 0;
+            $queryWords = array_filter(explode(' ', strtolower(preg_replace('/[^a-z0-9\s]/', '', $query))));
 
-            foreach (self::SCRAPERS as $storeKey => $scraperClass) {
+            foreach (self::ACTIVE_SCRAPERS as $storeKey => $scraperClass) {
                 try {
                     $scraper = new $scraperClass();
                     $results = $scraper->searchAll($query);
-                    $allResults = array_merge($allResults, $results);
+                    
+                    // Filter out irrelevant results (results that don't contain query words)
+                    $filtered = array_filter($results, function ($r) use ($queryWords) {
+                        $name = strtolower($r['name'] ?? '');
+                        // Must contain at least one significant query word (>2 chars)
+                        $matchCount = 0;
+                        foreach ($queryWords as $word) {
+                            if (strlen($word) > 2 && strpos($name, $word) !== false) {
+                                $matchCount++;
+                            }
+                        }
+                        // Require at least one match OR if query is very short
+                        return $matchCount > 0 || count($queryWords) === 0;
+                    });
+                    
+                    $allResults = array_merge($allResults, array_values($filtered));
                     $storesSearched++;
-                    ScraperMonitor::recordSuccess($storeKey, count($results));
+                    ScraperMonitor::recordSuccess($storeKey, count($filtered));
                 } catch (\Throwable $e) {
                     Log::warning("Scraper {$scraperClass} failed", [
                         'query' => $query,

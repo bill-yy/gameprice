@@ -366,6 +366,8 @@ class AllKeyShopScraper
             $gameName = strip_tags($titleMatch[1]);
             $gameName = preg_replace('/\s*CD Key.*$/i', '', $gameName);
             $gameName = preg_replace('/\s*Compare Prices.*$/i', '', $gameName);
+            $gameName = preg_replace('/[\t\n\r\f\v]+/', ' ', $gameName); // Remove all whitespace types
+            $gameName = preg_replace('/\s+/', ' ', $gameName);          // Collapse multiple spaces
             $gameName = trim($gameName);
         }
         
