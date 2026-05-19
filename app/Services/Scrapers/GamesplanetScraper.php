@@ -104,50 +104,56 @@ class GamesplanetScraper
     {
         $products = [];
 
-        // Match product rows: game_list game_list_small
+        // Find all game links with their surrounding content
+        // Each product has: <a href="/game/..."> with title, and nearby price_current
         preg_match_all(
-            '/<div[^>]*class="[^"]*game_list[^"]*"[^>]*>.*?<\/div>\s*<\/div>\s*<\/div>/s',
+            '/<a[^>]*href="(\/game\/[^"]+)"[^>]*>(?:\s*<img[^>]*alt="([^"]*)"[^>]*>)?/i',
             $html,
-            $matches,
+            $linkMatches,
             PREG_SET_ORDER
         );
 
-        foreach ($matches as $match) {
-            $block = $match[0];
+        foreach ($linkMatches as $match) {
+            $url = self::BASE_URL . $match[1];
+            $name = isset($match[2]) && !empty($match[2]) ? trim($match[2]) : null;
 
-            // Extract title from h4 > a or img alt
-            $name = null;
-            if (preg_match('/<h4[^>]*>.*?<a[^>]*>([^<]+)<\/a>/s', $block, $nameMatch)) {
-                $name = trim($nameMatch[1]);
-            } elseif (preg_match('/<img[^>]*alt="([^"]*)"/', $block, $imgMatch)) {
-                $name = trim($imgMatch[1]);
+            // If no alt text, try to find the title from nearby h4
+            if (!$name) {
+                $pos = strpos($html, $match[0]);
+                if ($pos !== false) {
+                    $nearby = substr($html, $pos, 500);
+                    if (preg_match('/<h[1-6][^>]*>.*?<a[^>]*>([^<]+)<\/a>/s', $nearby, $titleMatch)) {
+                        $name = trim($titleMatch[1]);
+                    }
+                }
             }
 
-            if (! $name) {
+            if (!$name) {
                 continue;
             }
 
-            // Extract link
-            $url = null;
-            if (preg_match('/href="(\/game\/[^"]+)"/', $block, $linkMatch)) {
-                $url = self::BASE_URL . $linkMatch[1];
-            }
-
-            // Extract current price
+            // Find price near this link
+            $pos = strpos($html, $match[0]);
             $price = null;
-            if (preg_match('/<span[^>]*class="[^"]*price_current[^"]*"[^>]*>([^<]+)<\/span>/', $block, $priceMatch)) {
-                $priceStr = trim($priceMatch[1]);
-                $price = $this->parsePrice($priceStr);
+            if ($pos !== false) {
+                // Search in next 800 chars for price_current
+                $nearby = substr($html, $pos, 800);
+                if (preg_match('/<span[^>]*class="[^"]*price_current[^"]*"[^>]*>([^<]+)<\/span>/', $nearby, $priceMatch)) {
+                    $price = $this->parsePrice(trim($priceMatch[1]));
+                }
             }
 
             if ($price === null || $price <= 0) {
                 continue;
             }
 
-            // Extract original/base price if exists
+            // Check for original/base price
             $originalPrice = null;
-            if (preg_match('/<span[^>]*class="[^"]*price_base[^"]*"[^>]*>([^<]+)<\/span>/', $block, $baseMatch)) {
-                $originalPrice = $this->parsePrice(trim($baseMatch[1]));
+            if ($pos !== false) {
+                $nearby = substr($html, $pos, 800);
+                if (preg_match('/<span[^>]*class="[^"]*price_base[^"]*"[^>]*>([^<]+)<\/span>/', $nearby, $baseMatch)) {
+                    $originalPrice = $this->parsePrice(trim($baseMatch[1]));
+                }
             }
             if ($originalPrice === null || $originalPrice <= 0) {
                 $originalPrice = $price;
@@ -159,10 +165,10 @@ class GamesplanetScraper
                 $discount = (int) round((1 - $price / $originalPrice) * 100);
             }
 
-            // Extract region info from URL or title
-            $region = 'global';
-            if (stripos($name, 'Steam') !== false) {
-                $region = 'global'; // Steam keys are typically global on Gamesplanet
+            // Avoid duplicates (same URL)
+            $existing = array_filter($products, fn($p) => $p['url'] === $url);
+            if (!empty($existing)) {
+                continue;
             }
 
             $products[] = [
@@ -170,9 +176,9 @@ class GamesplanetScraper
                 'price_eur' => $this->usdToEur($price),
                 'original_price_eur' => $this->usdToEur($originalPrice),
                 'discount_percent' => $discount,
-                'url' => $url ?? self::BASE_URL,
-                'region' => $region,
-                'in_stock' => true, // Gamesplanet shows available products
+                'url' => $url,
+                'region' => 'global',
+                'in_stock' => true,
             ];
         }
 
