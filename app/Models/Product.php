@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'current_price',
     'original_price',
     'discount_percent',
+    'is_real_price',
     'currency',
     'in_stock',
 ])]

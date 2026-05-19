@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'itad' => [
+        'api_key' => env('ITAD_API_KEY'),
+    ],
+
 ];
