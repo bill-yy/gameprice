@@ -133,22 +133,32 @@ class AllKeyShopScraper
     {
         $products = [];
         
-        // Extract JSON-LD offers
-        preg_match('/"offers":\s*(\[.*?\])/s', $html, $match);
+        // Extract full JSON-LD Product block
+        preg_match_all('/<script type="application\/ld\+json">(.*?)<\/script>/s', $html, $matches);
         
-        if (!$match) {
-            Log::warning('AllKeyShop: No offers JSON found', ['query' => $query]);
+        $productData = null;
+        foreach ($matches[1] ?? [] as $jsonStr) {
+            $jsonStr = trim($jsonStr);
+            $data = json_decode($jsonStr, true);
+            if (json_last_error() === JSON_ERROR_NONE && ($data['@type'] ?? '') === 'Product') {
+                $productData = $data;
+                break;
+            }
+        }
+        
+        if (!$productData || !isset($productData['offers']['offers'])) {
+            Log::warning('AllKeyShop: No valid Product JSON-LD found', ['query' => $query]);
             return [];
         }
         
-        $offers = json_decode($match[1], true);
+        $offers = $productData['offers']['offers'];
         
         if (!is_array($offers)) {
-            Log::warning('AllKeyShop: Failed to parse offers JSON', ['query' => $query]);
+            Log::warning('AllKeyShop: Offers is not an array', ['query' => $query]);
             return [];
         }
         
-        // Also extract game name from the page
+        // Extract game name from the page
         $gameName = $query;
         preg_match('/<h1[^>]*>(.*?)<\/h1>/s', $html, $titleMatch);
         if ($titleMatch) {
@@ -171,7 +181,7 @@ class AllKeyShopScraper
                 continue;
             }
             
-            $inStock = strpos($availability, 'InStock') !== false || strpos($availability, 'InStock') !== false;
+            $inStock = strpos($availability, 'InStock') !== false;
             
             // Only keep the lowest price per merchant
             if (!isset($merchantPrices[$seller]) || $merchantPrices[$seller]['price'] > $price) {
