@@ -34,11 +34,30 @@ export default {
       });
     }
 
+    let targetUrl;
+    let targetMethod = request.method;
+    let targetHeaders = {};
+    let targetBody = null;
+
     const url = new URL(request.url);
-    const targetUrl = url.searchParams.get('url');
+
+    // Support both GET (?url=) and POST (JSON body)
+    if (request.method === 'POST') {
+      try {
+        const body = await request.json();
+        targetUrl = body.url;
+        if (body.method) targetMethod = body.method;
+        if (body.headers) targetHeaders = body.headers;
+        if (body.body) targetBody = JSON.stringify(body.body);
+      } catch (e) {
+        return jsonResponse({ error: 'Invalid JSON body. Expected: {url, method?, headers?, body?}' }, 400);
+      }
+    } else {
+      targetUrl = url.searchParams.get('url');
+    }
 
     if (!targetUrl) {
-      return jsonResponse({ error: 'Missing ?url= parameter' }, 400);
+      return jsonResponse({ error: 'Missing url parameter. Use ?url= for GET or JSON body {url: "..."} for POST' }, 400);
     }
 
     // Validate target host
@@ -55,10 +74,10 @@ export default {
 
     // Build request to target
     const init = {
-      method: request.method,
+      method: targetMethod,
       headers: {
         'User-Agent': USER_AGENT,
-        'Accept': request.headers.get('Accept') || 'application/json, text/html, */*',
+        'Accept': 'application/json, text/html, */*',
         'Accept-Language': 'en-US,en;q=0.9',
         'Accept-Encoding': 'gzip, deflate, br',
         'Referer': `${target.protocol}//${target.host}/`,
@@ -72,13 +91,14 @@ export default {
       },
     };
 
-    // Forward body for POST requests
-    if (request.method === 'POST' && request.body) {
-      init.body = request.body;
-      const contentType = request.headers.get('Content-Type');
-      if (contentType) {
-        init.headers['Content-Type'] = contentType;
-      }
+    // Override with user-provided headers
+    for (const [key, value] of Object.entries(targetHeaders)) {
+      init.headers[key] = value;
+    }
+
+    // Forward body for POST/PUT requests
+    if (targetBody && (targetMethod === 'POST' || targetMethod === 'PUT')) {
+      init.body = targetBody;
     }
 
     try {
