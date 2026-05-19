@@ -15,7 +15,7 @@ RUN apk add --no-cache \
     nodejs \
     npm
 
-# Instalar extensiones PHP
+# Instalar extensiones PHP + Redis
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install -j$(nproc) \
     pdo_pgsql \
@@ -27,7 +27,11 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
     bcmath \
     intl \
     gd \
-    opcache
+    opcache \
+    && apk add --no-cache --virtual .build-deps $PHPIZE_DEPS \
+    && pecl install redis \
+    && docker-php-ext-enable redis \
+    && apk del .build-deps
 
 # Configurar OPcache para producción
 COPY docker/opcache.ini /usr/local/etc/php/conf.d/opcache.ini
@@ -46,14 +50,18 @@ RUN composer install --no-dev --no-scripts --no-autoloader --prefer-dist
 COPY package.json package-lock.json* ./
 RUN npm ci
 
+# Cache buster — change this to invalidate COPY . .
+ARG CACHE_BUST_COPY=task22-rapidapi-v1
+RUN echo "Copy bust: ${CACHE_BUST_COPY}" > /dev/null
+
 # Copiar todo el código
 COPY . .
 
 # Build de assets y optimización
-RUN composer dump-autoload --optimize \
-    && php artisan optimize \
-    && php artisan view:cache \
-    && php artisan event:cache \
+# ARG must be consumed in a RUN to bust Docker cache
+ARG CACHE_BUST=task22-rapidapi-v1
+RUN echo "Build ID: ${CACHE_BUST}" > /dev/null \
+    && composer dump-autoload --optimize \
     && npm run build \
     && rm -rf node_modules
 
@@ -67,6 +75,12 @@ COPY docker/nginx.conf /etc/nginx/nginx.conf
 # Supervisor para gestionar php-fpm + nginx + queue worker
 COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
+# Entrypoint que limpia el config cache del build y recachea con las env vars reales
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 EXPOSE 80
 
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+# Deploy trigger 1778700000
+# Cache bust 1778679952

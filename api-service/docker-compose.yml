@@ -1,0 +1,39 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:80"
+    environment:
+      - APP_ENV=production
+      - APP_DEBUG=false
+      - APP_KEY=${APP_KEY:-base64:generate-with-artisan-key-generate}
+      - DB_CONNECTION=pgsql
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_DATABASE=gameprice_api
+      - DB_USERNAME=gameprice
+      - DB_PASSWORD=secret
+      - API_RATE_LIMIT=100
+      - API_KEYS=dev-key-change-me-in-production
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: gameprice_api
+      POSTGRES_USER: gameprice
+      POSTGRES_PASSWORD: secret
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gameprice -d gameprice_api"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  pgdata:

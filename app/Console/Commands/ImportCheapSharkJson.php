@@ -1,0 +1,226 @@
+<?php
+
+namespace App\Console\Commands;
+
+use App\Models\Game;
+use App\Models\Product;
+use App\Models\Store;
+use Carbon\Carbon;
+use Illuminate\Console\Command;
+use Illuminate\Support\Str;
+
+class ImportCheapSharkJson extends Command
+{
+    protected $signature = 'prices:import-cheapshark-json';
+
+    protected $description = 'Import CheapShark deals from storage/app/cheapshark_deals.json';
+
+    private array $storeMap = [
+        '1'  => 'steam',
+        '2'  => 'gamersgate',
+        '3'  => 'green-man-gaming',
+        '7'  => 'gog',
+        '11' => 'humble-bundle',
+        '13' => 'uplay',
+        '15' => 'fanatical',
+        '21' => 'wingamestore',
+        '23' => 'gamebillet',
+        '25' => 'epic-games-store',
+        '27' => 'gamesplanet',
+        '28' => 'gamesload',
+        '29' => '2game',
+        '30' => 'indiegala',
+        '35' => 'dreamgame',
+    ];
+
+    public function handle(): int
+    {
+        $path = base_path('data/cheapshark_deals.json');
+
+        if (! file_exists($path)) {
+            $this->error("File not found: {$path}");
+
+            return self::FAILURE;
+        }
+
+        $json = file_get_contents($path);
+        $deals = json_decode($json, true);
+
+        if (! is_array($deals)) {
+            $this->error('Invalid JSON');
+
+            return self::FAILURE;
+        }
+
+        $this->info('Importing ' . count($deals) . ' deals...');
+
+        $stores = Store::whereIn('slug', array_values($this->storeMap))
+            ->get()
+            ->keyBy('slug');
+
+        $createdGames = 0;
+        $updatedGames = 0;
+        $createdProducts = 0;
+        $updatedProducts = 0;
+
+        $bar = $this->output->createProgressBar(count($deals));
+        $bar->start();
+
+        foreach ($deals as $deal) {
+            $result = $this->processDeal($deal, $stores);
+            if ($result['game_created']) $createdGames++;
+            if ($result['game_updated']) $updatedGames++;
+            if ($result['product_created']) $createdProducts++;
+            if ($result['product_updated']) $updatedProducts++;
+            $bar->advance();
+        }
+
+        $bar->finish();
+        $this->newLine();
+        $this->info("Done! Games: +{$createdGames} created, {$updatedGames} updated. Products: +{$createdProducts} created, {$updatedProducts} updated.");
+
+        return self::SUCCESS;
+    }
+
+    private function processDeal(array $deal, $stores): array
+    {
+        $result = [
+            'game_created' => false,
+            'game_updated' => false,
+            'product_created' => false,
+            'product_updated' => false,
+        ];
+
+        $steamAppId = $deal['steamAppID'] ?? null;
+        $storeId = (string) ($deal['storeID'] ?? '');
+        $title = $deal['title'] ?? null;
+        $salePrice = isset($deal['salePrice']) ? (float) $deal['salePrice'] : null;
+        $normalPrice = isset($deal['normalPrice']) ? (float) $deal['normalPrice'] : null;
+
+        if (! $steamAppId || ! isset($this->storeMap[$storeId]) || ! $title || ! $salePrice) {
+            return $result;
+        }
+
+        $storeSlug = $this->storeMap[$storeId];
+        $store = $stores->get($storeSlug);
+
+        if (! $store) {
+            return $result;
+        }
+
+        $game = Game::where('steam_app_id', $steamAppId)->first();
+
+        if (! $game) {
+            $releaseDate = null;
+            if (! empty($deal['releaseDate']) && is_numeric($deal['releaseDate'])) {
+                try {
+                    $releaseDate = Carbon::createFromTimestamp($deal['releaseDate'])->format('Y-m-d');
+                } catch (\Throwable) {
+                    // ignore
+                }
+            }
+
+            $slug = Str::slug($title);
+            if (Game::where('slug', $slug)->exists()) {
+                $slug .= '-' . $steamAppId;
+            }
+
+            $game = Game::create([
+                'slug' => $slug,
+                'title' => $title,
+                'steam_app_id' => $steamAppId,
+                'description' => null,
+                'release_date' => $releaseDate,
+                'cover_image' => "https://cdn.cloudflare.steamstatic.com/steam/apps/{$steamAppId}/header.jpg",
+                'platforms' => ['windows'],
+                'genres' => [],
+                'developer' => null,
+                'publisher' => null,
+                'metacritic_score' => isset($deal['metacriticScore']) && $deal['metacriticScore'] ? (int) $deal['metacriticScore'] : null,
+                'is_active' => true,
+            ]);
+            $result['game_created'] = true;
+        } else {
+            if (! $game->cover_image) {
+                $game->cover_image = "https://cdn.cloudflare.steamstatic.com/steam/apps/{$steamAppId}/header.jpg";
+                $game->save();
+                $result['game_updated'] = true;
+            }
+        }
+
+        $discountPercent = $normalPrice > 0
+            ? (int) round((1 - ($salePrice / $normalPrice)) * 100)
+            : 0;
+
+        $product = Product::where('game_id', $game->id)
+            ->where('store_id', $store->id)
+            ->first();
+
+        $attributes = [
+            'current_price' => $salePrice,
+            'original_price' => $normalPrice,
+            'discount_percent' => $discountPercent,
+            'is_real_price' => true,
+            'url' => "https://www.cheapshark.com/redirect?dealID={$deal['dealID']}",
+            'affiliate_url' => "https://www.cheapshark.com/redirect?dealID={$deal['dealID']}",
+            'in_stock' => true,
+            'currency' => 'EUR',
+            'platform' => 'PC',
+            'region' => $this->extractRegion($title),
+            'type' => 'key',
+        ];
+
+        if ($product) {
+            $product->fill($attributes)->save();
+            $result['product_updated'] = true;
+        } else {
+            $product = Product::create(array_merge($attributes, [
+                'game_id' => $game->id,
+                'store_id' => $store->id,
+            ]));
+            $result['product_created'] = true;
+        }
+
+        $latestHistory = \App\Models\PriceHistory::where('product_id', $product->id)
+            ->orderByDesc('recorded_at')
+            ->first();
+
+        if (!$latestHistory || $latestHistory->price != $product->current_price) {
+            \App\Models\PriceHistory::create([
+                'product_id' => $product->id,
+                'price' => $product->current_price,
+                'currency' => $product->currency,
+                'recorded_at' => now(),
+            ]);
+        }
+
+        return $result;
+    }
+
+    private function extractRegion(string $name): string
+    {
+        $upper = strtoupper($name);
+        $map = [
+            'GLOBAL' => 'global',
+            'EUROPE' => 'EU',
+            '(EU)' => 'EU',
+            'NORTH AMERICA' => 'US',
+            '(US)' => 'US',
+            '(USA)' => 'US',
+            '(NA)' => 'US',
+            'LATAM' => 'LATAM',
+            'LATIN AMERICA' => 'LATAM',
+            'RUSSIA' => 'RU',
+            '(RU)' => 'RU',
+            'CIS' => 'CIS',
+            'ASIA' => 'ASIA',
+            'APAC' => 'ASIA',
+        ];
+        foreach ($map as $needle => $region) {
+            if (str_contains($upper, $needle)) {
+                return $region;
+            }
+        }
+        return 'global';
+    }
+}

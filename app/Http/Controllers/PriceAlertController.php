@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Game;
 use App\Models\PriceAlert;
 use Illuminate\Http\Request;
 
@@ -14,6 +15,20 @@ class PriceAlertController extends Controller
             'email' => ['required', 'email', 'max:255'],
             'target_price' => ['required', 'numeric', 'min:0'],
         ]);
+
+        $lowestPrice = Game::findOrFail($validated['game_id'])
+            ->products()
+            ->where('is_real_price', true)
+            ->orderBy('current_price')
+            ->value('current_price');
+
+        if ($lowestPrice === null) {
+            return back()->with('error', 'No hay precios disponibles para este juego.');
+        }
+
+        if ($validated['target_price'] >= $lowestPrice) {
+            return back()->with('error', 'El precio objetivo debe ser menor que el precio actual más bajo (' . number_format($lowestPrice, 2) . '€).');
+        }
 
         PriceAlert::create([
             'game_id' => $validated['game_id'],

@@ -3,20 +3,25 @@
 namespace App\Http\Controllers;
 
 use App\Models\Game;
+use App\Models\Product;
+use App\Models\Store;
+use App\Models\Voucher;
+use App\Jobs\FetchPricesForGame;
+use App\Services\OnDemandSearchService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 
 class GameController extends Controller
 {
     public function index(Request $request)
     {
-        $page = $request->input('page', 1);
         $search = $request->input('search', '');
-        $cacheKey = "games.index.page.{$page}.search." . md5($search);
+        $cacheKey = 'games.index.' . md5(json_encode($request->all()));
 
         $games = Cache::remember($cacheKey, 3600, function () use ($request) {
-            return Game::query()
+            $query = Game::query()
                 ->with('products.store')
                 ->when($request->search, function ($q, $search) {
                     $driver = $q->getConnection()->getDriverName();
@@ -25,15 +30,117 @@ class GameController extends Controller
                     } else {
                         $q->where('title', 'like', "%{$search}%");
                     }
-                })
-                ->orderByDesc('metacritic_score')
-                ->paginate(24)
-                ->withQueryString();
+                });
+
+            if ($request->filled('price_min') || $request->filled('price_max')) {
+                $query->whereHas('products', function ($q) use ($request) {
+                    $q->where('is_real_price', true);
+                    if ($request->filled('price_min')) {
+                        $q->where('current_price', '>=', $request->price_min);
+                    }
+                    if ($request->filled('price_max')) {
+                        $q->where('current_price', '<=', $request->price_max);
+                    }
+                });
+            }
+
+            if ($request->filled('discount_min')) {
+                $query->whereHas('products', function ($q) use ($request) {
+                    $q->where('is_real_price', true)
+                      ->where('discount_percent', '>=', $request->discount_min);
+                });
+            }
+
+            if ($request->filled('region')) {
+                $query->whereHas('products', function ($q) use ($request) {
+                    $q->where('region', $request->region);
+                });
+            }
+
+            if ($request->filled('store')) {
+                $storeSlugs = explode(',', $request->store);
+                $query->whereHas('products.store', function ($q) use ($storeSlugs) {
+                    $q->whereIn('slug', $storeSlugs);
+                });
+            }
+
+            $sort = $request->input('sort', '');
+            switch ($sort) {
+                case 'price_asc':
+                    $query->orderBy(
+                        Product::selectRaw('MIN(current_price)')
+                            ->whereColumn('products.game_id', 'games.id')
+                            ->where('is_real_price', true)
+                    );
+                    break;
+                case 'price_desc':
+                    $query->orderByDesc(
+                        Product::selectRaw('MIN(current_price)')
+                            ->whereColumn('products.game_id', 'games.id')
+                            ->where('is_real_price', true)
+                    );
+                    break;
+                case 'discount_desc':
+                    $query->orderByDesc(
+                        Product::selectRaw('MAX(discount_percent)')
+                            ->whereColumn('products.game_id', 'games.id')
+                            ->where('is_real_price', true)
+                    );
+                    break;
+                case 'release_desc':
+                    $query->orderByDesc('release_date');
+                    break;
+                case 'name_asc':
+                    $query->orderBy('title');
+                    break;
+                default:
+                    $query->orderByDesc('metacritic_score');
+                    break;
+            }
+
+            $paginator = $query->paginate(24)->withQueryString();
+
+            return $paginator->toArray();
         });
+
+        $trending = Game::query()
+            ->with(['products' => fn($q) => $q->where('is_real_price', true)->orderBy('current_price')])
+            ->whereHas('products', fn($q) => $q->where('is_real_price', true))
+            ->orderByDesc('metacritic_score')
+            ->limit(8)
+            ->get();
+
+        $bestDeals = Game::query()
+            ->with(['products' => fn($q) => $q->where('is_real_price', true)->orderBy('current_price')])
+            ->whereHas('products', fn($q) => $q->where('is_real_price', true)->where('discount_percent', '>', 50))
+            ->orderByDesc(
+                Product::selectRaw('MAX(discount_percent)')
+                    ->whereColumn('products.game_id', 'games.id')
+            )
+            ->limit(8)
+            ->get();
+
+        $newReleases = Game::query()
+            ->with(['products' => fn($q) => $q->where('is_real_price', true)->orderBy('current_price')])
+            ->whereNotNull('release_date')
+            ->where('release_date', '>=', now()->subDays(30))
+            ->whereHas('products', fn($q) => $q->where('is_real_price', true))
+            ->orderByDesc('release_date')
+            ->limit(8)
+            ->get();
+
+        $stores = Store::where('is_active', true)->get(['id', 'name', 'slug']);
+        $regions = Product::distinct()->pluck('region')->filter()->sort()->values();
 
         return Inertia::render('Home', [
             'games' => $games,
-            'filters' => $request->only('search'),
+            'trendingGames' => $trending,
+            'bestDeals' => $bestDeals,
+            'newReleases' => $newReleases,
+            'stores' => $stores,
+            'regions' => $regions,
+            'filters' => $request->only(['search', 'price_min', 'price_max', 'discount_min', 'region', 'store', 'sort']),
+            'onDemandSearchUrl' => route('search.steam'),
             'seo' => [
                 'title' => 'GamePrice.es - Compara precios de videojuegos',
                 'description' => 'Encuentra los mejores precios para tus videojuegos favoritos. Compara ofertas de Eneba, Instant Gaming, Fanatical y más tiendas.',
@@ -92,25 +199,236 @@ class GameController extends Controller
                 ])->values()->all(),
             ];
 
-            return compact('game', 'products', 'lowestPrice', 'highestDiscount', 'schema');
+            return [
+                'game' => $game->toArray(),
+                'products' => $products->values()->toArray(),
+                'reviews' => $game->reviews->toArray(),
+                'lowestPrice' => $lowestPrice,
+                'highestDiscount' => $highestDiscount,
+                'schema' => $schema,
+                'vouchers' => Voucher::whereIn('store_id', $products->pluck('store_id')->unique())
+                    ->where('is_active', true)
+                    ->where('valid_from', '<=', now())
+                    ->where('valid_until', '>=', now())
+                    ->get()
+                    ->keyBy('store_id')
+                    ->toArray(),
+                'priceHistories' => $products->mapWithKeys(fn($p) => [
+                    $p->id => $p->priceHistory()
+                        ->where('recorded_at', '>=', now()->subMonths(6))
+                        ->orderBy('recorded_at')
+                        ->get(['price', 'recorded_at'])
+                        ->toArray()
+                ])->toArray(),
+            ];
         });
+
+        $lastFetched = Product::where('game_id', $game->id)
+            ->where('is_real_price', true)
+            ->max('price_fetched_at');
+
+        $needsRefresh = !$lastFetched || \Carbon\Carbon::parse($lastFetched)->diffInHours(now()) >= 24;
+
+        if ($needsRefresh) {
+            FetchPricesForGame::dispatch($game);
+            Cache::forget($cacheKey);
+        }
 
         return Inertia::render('GameShow', [
             'game' => $data['game'],
             'products' => $data['products'],
-            'reviews' => $data['game']->reviews,
+            'reviews' => $data['reviews'],
+            'priceHistories' => $data['priceHistories'],
+            'vouchers' => $data['vouchers'],
             'seo' => [
-                'title' => "{$data['game']->title} - Compara precios | GamePrice",
-                'description' => "Compra {$data['game']->title} al mejor precio. Desde {$data['lowestPrice']}€. " . ($data['highestDiscount'] > 0 ? "Ahorra hasta un {$data['highestDiscount']}% " : '') . "en Eneba, Instant Gaming y más tiendas.",
-                'canonical' => route('game.show', $data['game']->slug),
+                'title' => "{$data['game']['title']} - Compara precios | GamePrice",
+                'description' => "Compra {$data['game']['title']} al mejor precio. Desde {$data['lowestPrice']}€. " . ($data['highestDiscount'] > 0 ? "Ahorra hasta un {$data['highestDiscount']}% " : '') . "en Eneba, Instant Gaming y más tiendas.",
+                'canonical' => route('game.show', $data['game']['slug']),
                 'schema' => $data['schema'],
                 'og' => [
-                    'title' => "{$data['game']->title} - Compara precios | GamePrice",
+                    'title' => "{$data['game']['title']} - Compara precios | GamePrice",
                     'description' => "Desde {$data['lowestPrice']}€. Compara ofertas de tiendas oficiales y grey market.",
-                    'image' => $data['game']->cover_image,
+                    'image' => $data['game']['cover_image'],
                     'type' => 'product',
                 ],
             ],
         ]);
+    }
+
+    public function refreshPrices(Request $request, Game $game)
+    {
+        Log::info('refreshPrices: START', [
+            'game_id' => $game->id,
+            'game_title' => $game->title,
+            'is_ajax' => $request->ajax(),
+            'wants_json' => $request->wantsJson(),
+            'x_requested_with' => $request->header('X-Requested-With'),
+        ]);
+
+        try {
+            $previousLimit = ini_get('max_execution_time');
+            set_time_limit(60);
+
+            $deleted = Product::where('game_id', $game->id)->where('is_real_price', false)->delete();
+            Log::info('refreshPrices: deleted non-real products', ['count' => $deleted]);
+
+            $job = new FetchPricesForGame($game);
+            $job->handle();
+
+            Cache::forget("games.show.{$game->slug}");
+
+            if ($previousLimit && $previousLimit !== '0') {
+                set_time_limit((int) $previousLimit);
+            }
+
+            Log::info('refreshPrices: SUCCESS', ['game_id' => $game->id]);
+
+            if ($request->wantsJson() || $request->header('X-Requested-With') === 'XMLHttpRequest') {
+                return response()->json(['success' => true, 'message' => 'Precios actualizados']);
+            }
+
+            return back()->with('success', 'Precios actualizados');
+        } catch (\Throwable $e) {
+            Log::error('refreshPrices: FAILED', [
+                'game_id' => $game->id,
+                'game_title' => $game->title,
+                'exception_class' => get_class($e),
+                'message' => $e->getMessage(),
+                'file' => $e->getFile() . ':' . $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            if ($request->wantsJson() || $request->header('X-Requested-With') === 'XMLHttpRequest') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Error al actualizar precios.',
+                    'error' => config('app.debug') ? $e->getMessage() : null,
+                    'file' => config('app.debug') ? $e->getFile() . ':' . $e->getLine() : null,
+                ], 500);
+            }
+
+            return back()->with('error', 'Error al actualizar precios. Inténtalo de nuevo.');
+        }
+    }
+
+    public function testScraper(Game $game)
+    {
+        Log::info('testScraper: START', [
+            'game_id' => $game->id,
+            'game_title' => $game->title,
+        ]);
+
+        try {
+            $scraper = new \App\Services\Scrapers\CheapSharkScraper();
+            $result = $scraper->search($game->title);
+
+            Log::info('testScraper: RESULT', [
+                'game_id' => $game->id,
+                'result' => $result,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'game' => [
+                    'id' => $game->id,
+                    'title' => $game->title,
+                    'slug' => $game->slug,
+                ],
+                'scraper' => 'CheapShark',
+                'result' => $result,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('testScraper: FAILED', [
+                'game_id' => $game->id,
+                'exception_class' => get_class($e),
+                'message' => $e->getMessage(),
+                'file' => $e->getFile() . ':' . $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'game' => [
+                    'id' => $game->id,
+                    'title' => $game->title,
+                ],
+                'error' => $e->getMessage(),
+                'exception_class' => get_class($e),
+                'file' => $e->getFile() . ':' . $e->getLine(),
+                'trace' => config('app.debug') ? $e->getTraceAsString() : null,
+            ], 500);
+        }
+    }
+
+    public function searchSuggestions(Request $request)
+    {
+        $query = trim($request->input('query', ''));
+
+        if (strlen($query) < 3) {
+            return response()->json(['db' => [], 'steam' => []]);
+        }
+
+        $driver = Game::query()->getConnection()->getDriverName();
+
+        $dbResults = Game::query()
+            ->when($driver === 'pgsql', fn($q) => $q->whereRaw('title ilike ?', ["%{$query}%"]))
+            ->when($driver !== 'pgsql', fn($q) => $q->where('title', 'like', "%{$query}%"))
+            ->limit(5)
+            ->get(['slug', 'title', 'cover_image', 'release_date'])
+            ->values()
+            ->toArray();
+
+        $steamResults = [];
+        $remaining = 5 - count($dbResults);
+
+        if ($remaining > 0) {
+            try {
+                $response = \Illuminate\Support\Facades\Http::timeout(5)->withHeaders([
+                    'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                ])->get('https://store.steampowered.com/api/storesearch/', [
+                    'term' => $query,
+                    'l' => 'english',
+                    'cc' => 'ES',
+                ]);
+
+                $items = $response->json('items') ?? [];
+                $dbTitles = array_map('strtolower', array_column($dbResults, 'title'));
+
+                foreach ($items as $item) {
+                    if (count($steamResults) >= $remaining) {
+                        break;
+                    }
+                    if (in_array(strtolower($item['name'] ?? ''), $dbTitles)) {
+                        continue;
+                    }
+                    $steamResults[] = [
+                        'appid' => $item['id'],
+                        'name' => $item['name'],
+                        'tiny_image' => $item['tiny_image'] ?? null,
+                    ];
+                }
+            } catch (\Exception $e) {
+                \Illuminate\Support\Facades\Log::warning('Steam suggestions failed: ' . $e->getMessage());
+            }
+        }
+
+        return response()->json([
+            'db' => $dbResults,
+            'steam' => $steamResults,
+        ]);
+    }
+
+    public function searchOnDemand(Request $request)
+    {
+        $request->validate(['query' => 'required|string|min:2']);
+
+        $onDemand = app(OnDemandSearchService::class);
+        $found = $onDemand->search($request->input('query'));
+
+        if ($found) {
+            return redirect()->route('game.show', $found->slug);
+        }
+
+        return back()->with('error', 'No se encontró el juego en Steam');
     }
 }

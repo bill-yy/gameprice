@@ -16,6 +16,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'commission_rate',
     'is_official',
     'is_active',
+    'rating',
+    'review_count',
 ])]
 class Store extends Model
 {
@@ -24,5 +26,10 @@ class Store extends Model
     public function products(): HasMany
     {
         return $this->hasMany(Product::class);
+    }
+
+    public function vouchers(): HasMany
+    {
+        return $this->hasMany(Voucher::class);
     }
 }

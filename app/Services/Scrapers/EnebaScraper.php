@@ -7,36 +7,63 @@ use Illuminate\Support\Facades\Log;
 
 class EnebaScraper
 {
-    private string $baseUrl = 'https://www.eneba.com';
+    public static function getStoreName(): string
+    {
+        return 'Eneba';
+    }
 
-    /**
-     * Search Eneba for a game title and return the best match.
-     *
-     * @return array{name: string, price_eur: float, original_price_eur: float, discount_percent: int, url: string}|null
-     */
-    public function search(string $gameTitle): ?array
+    public function searchAll(string $query): array
     {
         try {
-            $searchUrl = $this->baseUrl . '/store/games?text=' . urlencode($gameTitle);
+            $results = $this->searchEneba($query);
 
-            $response = Http::withHeaders([
-                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language' => 'en-US,en;q=0.9',
-            ])->timeout(30)->get($searchUrl);
+            return array_map(fn ($r) => [
+                'store' => self::getStoreName(),
+                'name' => $r['name'],
+                'price' => $r['price_eur'],
+                'original_price' => $r['original_price_eur'],
+                'discount_percent' => $r['discount_percent'],
+                'currency' => 'EUR',
+                'url' => $r['url'],
+                'in_stock' => $r['in_stock'],
+                'platform' => $r['drm'] ?? 'Unknown',
+            ], $results);
+        } catch (\Throwable $e) {
+            Log::warning('Eneba scraper failed', [
+                'query' => $query,
+                'error' => $e->getMessage(),
+            ]);
 
-            if (! $response->successful()) {
-                Log::warning('Eneba scraper HTTP error', ['status' => $response->status()]);
+            return [];
+        }
+    }
 
+    public function search(string $query): ?array
+    {
+        try {
+            $results = $this->searchEneba($query);
+
+            if (empty($results)) {
                 return null;
             }
 
-            $html = $response->body();
+            $bestMatch = $this->findBestMatch($results, $query);
 
-            return $this->extractBestMatch($html, $gameTitle);
+            if (!$bestMatch) {
+                return null;
+            }
+
+            return [
+                'name' => $bestMatch['name'],
+                'price_eur' => $bestMatch['price_eur'],
+                'original_price_eur' => $bestMatch['original_price_eur'],
+                'discount_percent' => $bestMatch['discount_percent'],
+                'url' => $bestMatch['url'],
+                'in_stock' => $bestMatch['in_stock'],
+            ];
         } catch (\Throwable $e) {
-            Log::error('Eneba scraper exception', [
-                'game' => $gameTitle,
+            Log::warning('Eneba scraper failed', [
+                'query' => $query,
                 'error' => $e->getMessage(),
             ]);
 
@@ -44,207 +71,142 @@ class EnebaScraper
         }
     }
 
-    /**
-     * Extract Apollo GraphQL JSON from HTML and find best matching product.
-     */
-    private function extractBestMatch(string $html, string $gameTitle): ?array
+    private function searchEneba(string $query): array
     {
-        // Eneba embeds Apollo Client cache as JSON in <script> tags
-        // Pattern: <script>window.__APOLLO_STATE__ = {...}</script>
-        if (! preg_match('/window\.__APOLLO_STATE__\s*=\s*(\{.*?\});?<\/script>/s', $html, $matches)) {
-            // Fallback: try to find any JSON with __typename:Product
-            if (! preg_match_all('/<script[^>]*>(\{.*?\})<\/script>/s', $html, $scriptMatches)) {
-                Log::warning('Eneba scraper: no Apollo state found');
+        $url = 'https://www.eneba.com/store/games?text=' . urlencode($query);
 
-                return null;
-            }
+        $response = Http::withHeaders([
+            'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+            'Accept' => 'text/html,application/xhtml+xml',
+            'Accept-Language' => 'en-US,en;q=0.9',
+        ])->timeout(5)->get($url);
 
-            $data = null;
-            foreach ($scriptMatches[1] as $script) {
-                $script = $this->fixJson($script);
-                $decoded = json_decode($script, true);
-                if ($decoded && $this->hasProducts($decoded)) {
-                    $data = $decoded;
-                    break;
-                }
-            }
+        Log::info('Scraper eneba: result', [
+            'game' => $query,
+            'success' => $response->successful(),
+            'http_status' => $response->status(),
+            'response_size' => strlen($response->body()),
+        ]);
 
-            if (! $data) {
-                return null;
-            }
-        } else {
-            $json = $this->fixJson($matches[1]);
-            $data = json_decode($json, true);
+        if (!$response->successful()) {
+            return [];
         }
 
-        if (! $data || ! is_array($data)) {
-            return null;
+        $html = $response->body();
+
+        preg_match_all('/<script[^>]*>(\{.*?\})<\/script>/s', $html, $matches);
+
+        if (empty($matches[1])) {
+            return [];
         }
 
-        $products = $this->extractProducts($data);
-        if (empty($products)) {
-            return null;
-        }
-
-        // Find best match by title similarity
-        $bestMatch = null;
-        $bestScore = 0;
-
-        foreach ($products as $product) {
-            $score = $this->similarity($product['name'], $gameTitle);
-            if ($score > $bestScore && $score > 0.5) {
-                $bestScore = $score;
-                $bestMatch = $product;
-            }
-        }
-
-        return $bestMatch;
-    }
-
-    /**
-     * Check if decoded data contains product entries.
-     */
-    private function hasProducts(array $data): bool
-    {
-        foreach ($data as $value) {
-            if (is_array($value) && isset($value['__typename']) && $value['__typename'] === 'Product') {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Extract all products from Apollo cache data.
-     *
-     * @return array<int, array{name: string, price_eur: float, original_price_eur: float, discount_percent: int, url: string}>
-     */
-    private function extractProducts(array $data): array
-    {
         $products = [];
 
-        foreach ($data as $key => $value) {
-            if (! is_array($value) || ! isset($value['__typename']) || $value['__typename'] !== 'Product') {
+        foreach ($matches[1] as $scriptContent) {
+            if (!str_contains($scriptContent, '__typename')) {
                 continue;
             }
 
-            $name = $value['name'] ?? null;
-            $slug = $value['slug'] ?? null;
-
-            if (! $name || ! $slug) {
+            $data = json_decode($scriptContent, true);
+            if (!is_array($data)) {
                 continue;
             }
 
-            // Resolve cheapest auction
-            $auction = $this->resolveAuction($value, $data);
-            if (! $auction) {
-                continue;
+            foreach ($data as $key => $value) {
+                if (!is_array($value) || ($value['__typename'] ?? null) !== 'Product') {
+                    continue;
+                }
+
+                $name = $value['name'] ?? null;
+                $slug = $value['slug'] ?? null;
+                $drm = $value['drm']['name'] ?? 'Unknown';
+                $regions = array_column($value['regions'] ?? [], 'name');
+
+                $cheapest = $value['cheapestAuction'] ?? null;
+                if (!$cheapest || !is_array($cheapest)) {
+                    continue;
+                }
+
+                $auctionRef = $cheapest['__ref'] ?? null;
+                if (!$auctionRef || !isset($data[$auctionRef])) {
+                    continue;
+                }
+
+                $auction = $data[$auctionRef];
+
+                $priceCents = $this->resolveMoney($auction, 'price({"currency":"EUR"})', $data);
+                $msrpCents = $this->resolveMoney($auction, 'msrp({"currency":"EUR"})', $data);
+                $promoCents = $this->resolveMoney($auction, 'promotionalPrice({"currency":"EUR"})', $data);
+                $discount = $auction['msrpDiscountPercent'] ?? $auction['promotionalDiscountPercent'] ?? null;
+
+                if (!$priceCents) {
+                    continue;
+                }
+
+                $products[] = [
+                    'name' => $name,
+                    'slug' => $slug,
+                    'drm' => $drm,
+                    'regions' => $regions,
+                    'price_eur' => $priceCents / 100,
+                    'original_price_eur' => ($msrpCents ?: $promoCents ?: $priceCents) / 100,
+                    'discount_percent' => $discount,
+                    'in_stock' => $auction['isInStock'] ?? false,
+                    'url' => "https://www.eneba.com/{$slug}",
+                ];
             }
 
-            $priceCents = $this->resolveMoney($auction, 'price({"currency":"EUR"})', $data);
-            if (! $priceCents) {
-                continue;
+            if (!empty($products)) {
+                break;
             }
-
-            $msrpCents = $this->resolveMoney($auction, 'msrp({"currency":"EUR"})', $data);
-            $discount = $auction['msrpDiscountPercent'] ?? 0;
-
-            $products[] = [
-                'name' => $this->extractGameTitle($name),
-                'price_eur' => $priceCents / 100,
-                'original_price_eur' => ($msrpCents ?: $priceCents) / 100,
-                'discount_percent' => $discount ?? 0,
-                'url' => "{$this->baseUrl}/{$slug}",
-            ];
         }
 
         return $products;
     }
 
-    /**
-     * Resolve auction reference from product.
-     */
-    private function resolveAuction(array $product, array $data): ?array
+    private function resolveMoney(array $auction, string $key, array $data): ?int
     {
-        // Direct cheapestAuction
-        if (isset($product['cheapestAuction']) && is_array($product['cheapestAuction'])) {
-            if (isset($product['cheapestAuction']['__ref'])) {
-                $ref = $product['cheapestAuction']['__ref'];
+        $ref = $auction[$key] ?? null;
 
-                return $data[$ref] ?? null;
-            }
-
-            return $product['cheapestAuction'];
+        if (is_array($ref) && isset($ref['__ref'])) {
+            $money = $data[$ref['__ref']] ?? [];
+            return $money['amount'] ?? null;
         }
-
-        return null;
-    }
-
-    /**
-     * Resolve money amount from auction.
-     */
-    private function resolveMoney(?array $auction, string $field, array $data): ?int
-    {
-        if (! $auction || ! isset($auction[$field])) {
-            return null;
-        }
-
-        $ref = $auction[$field];
 
         if (is_array($ref)) {
-            if (isset($ref['__ref'])) {
-                $money = $data[$ref['__ref']] ?? null;
-
-                return $money['amount'] ?? null;
-            }
-
             return $ref['amount'] ?? null;
         }
 
         return null;
     }
 
-    /**
-     * Remove platform/region suffixes from Eneba product names.
-     */
-    private function extractGameTitle(string $enebaName): string
+    private function findBestMatch(array $results, string $gameTitle): ?array
     {
-        // Remove "(PC) Steam Key GLOBAL", "Steam Key EUROPE", "Xbox Live Key", etc.
-        $title = preg_replace(
-            '/\s*\([^)]*\)\s*(Steam Key|Key|GOG Key|Xbox Live Key|PSN Key|Nintendo Switch Key)\s*(GLOBAL|EUROPE|US|ASIA|UNITED STATES|UNITED KINGDOM).*/i',
-            '',
-            $enebaName
-        );
+        $drmPriority = ['Steam' => 3, 'GOG.com' => 2, 'Unknown' => 1];
+        $regionPriority = ['Global' => 3, 'Europe' => 2];
 
-        return trim($title);
-    }
+        usort($results, function ($a, $b) use ($drmPriority, $regionPriority, $gameTitle) {
+            $aScore = 0;
+            $bScore = 0;
 
-    /**
-     * Fix common JSON issues from inline scripts (unescaped quotes, trailing commas).
-     */
-    private function fixJson(string $json): string
-    {
-        // Remove trailing commas before } or ]
-        $json = preg_replace('/,(\s*[}\]])/', '$1', $json);
+            $aScore += $drmPriority[$a['drm']] ?? 0;
+            $bScore += $drmPriority[$b['drm']] ?? 0;
 
-        return $json;
-    }
+            $aRegion = $a['regions'][0] ?? '';
+            $bRegion = $b['regions'][0] ?? '';
+            $aScore += $regionPriority[$aRegion] ?? 0;
+            $bScore += $regionPriority[$bRegion] ?? 0;
 
-    /**
-     * Calculate string similarity (0-1).
-     */
-    private function similarity(string $a, string $b): float
-    {
-        $a = strtolower(trim($a));
-        $b = strtolower(trim($b));
+            if (stripos($a['name'], $gameTitle) !== false) {
+                $aScore += 5;
+            }
+            if (stripos($b['name'], $gameTitle) !== false) {
+                $bScore += 5;
+            }
 
-        if ($a === $b) {
-            return 1.0;
-        }
+            return $bScore <=> $aScore;
+        });
 
-        similar_text($a, $b, $percent);
-
-        return $percent / 100;
+        return $results[0] ?? null;
     }
 }

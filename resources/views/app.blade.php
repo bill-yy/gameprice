@@ -3,6 +3,7 @@
     <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="csrf-token" content="{{ csrf_token() }}">
 
         <title inertia>{{ config('app.name', 'Laravel') }}</title>
 
@@ -14,6 +15,12 @@
         @routes
         @vite(['resources/js/app.js', "resources/js/Pages/{$page['component']}.vue"])
         @inertiaHead
+        <script>
+            if (window.axios && document.querySelector('meta[name="csrf-token"]')) {
+                window.axios.defaults.headers.common['X-CSRF-TOKEN'] =
+                    document.querySelector('meta[name="csrf-token"]').content;
+            }
+        </script>
     </head>
     <body class="font-sans antialiased">
         @inertia
