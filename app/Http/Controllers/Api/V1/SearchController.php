@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Services\Scrapers\AllKeyShopScraper;
 use App\Services\Scrapers\CDKeysScraper;
 use App\Services\Scrapers\CheapSharkScraper;
 use App\Services\Scrapers\EnebaScraper;
@@ -27,6 +28,7 @@ class SearchController extends Controller
         'kinguin' => KinguinScraper::class,
         'gamivo' => GamivoScraper::class,
         'gamesplanet' => GamesplanetScraper::class,
+        'allkeyshop' => AllKeyShopScraper::class,
         'cdkeys' => CDKeysScraper::class,
         'psn-store' => PSNStoreScraper::class,
         'xbox-store' => XboxStoreScraper::class,
