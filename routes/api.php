@@ -9,7 +9,7 @@ use App\Http\Controllers\Api\V1\WebhookController;
 use App\Http\Controllers\Api\V1\LandingController;
 use App\Http\Controllers\Api\V1\Admin\ApiDashboardController;
 
-Route::get('/health', fn () => response()->json(['status' => 'ok']))
+Route::get('/health', fn () => response()->json(['status' => 'ok', 'version' => '1.0.1']))
     ->withoutMiddleware([ApiKeyMiddleware::class, RateLimitMiddleware::class]);
 
 Route::get('/', [LandingController::class, 'index'])
