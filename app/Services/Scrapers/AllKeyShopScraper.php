@@ -205,7 +205,7 @@ class AllKeyShopScraper
                 'Sec-Fetch-Mode' => 'navigate',
                 'Sec-Fetch-Site' => 'cross-site',
                 'Cache-Control' => 'max-age=0',
-            ])->timeout(15)->get($url);
+            ])->timeout(8)->connectTimeout(5)->get($url);
             
             if ($response->successful() && strlen($response->body()) > 5000) {
                 return $response->body();
@@ -310,7 +310,10 @@ class AllKeyShopScraper
             }
         }
         
-        return array_values(array_unique(array_filter($slugs)));
+        // Limit to first 5 most likely slugs to avoid excessive HTTP calls
+        $slugs = array_slice(array_values(array_unique(array_filter($slugs))), 0, 5);
+        
+        return $slugs;
     }
     
     /**

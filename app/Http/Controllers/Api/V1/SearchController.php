@@ -68,7 +68,14 @@ class SearchController extends Controller
 
             foreach (self::ACTIVE_SCRAPERS as $storeKey => $scraperClass) {
                 try {
+                    // Each scraper gets max 20 seconds to avoid global timeout
                     $scraper = new $scraperClass();
+                    
+                    // For AllKeyShop, use a shorter timeout to prevent hanging
+                    if ($storeKey === 'allkeyshop') {
+                        set_time_limit(25); // Reset PHP time limit per scraper
+                    }
+                    
                     $results = $scraper->searchAll($query);
                     
                     // Filter out irrelevant results (results that don't contain query words)
