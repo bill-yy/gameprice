@@ -42,9 +42,11 @@ class AllKeyShopScraper
 
     private function searchAllKeyShop(string $query): array
     {
+        $query = trim($query);
+        
+        // Phase 1: Try direct product URLs with generated slugs
         $slugs = $this->generateSlugs($query);
         
-        // Phase 1: Try direct product URLs
         foreach ($slugs as $slug) {
             $url = self::BASE_URL . '/buy-' . $slug . '-cd-key-compare-prices/';
             $html = $this->fetchPage($url);
@@ -52,6 +54,11 @@ class AllKeyShopScraper
             if ($html) {
                 $offers = $this->parseOffers($html, $query);
                 if (!empty($offers)) {
+                    Log::info('AllKeyShop: Found via direct slug', [
+                        'query' => $query,
+                        'slug' => $slug,
+                        'results' => count($offers),
+                    ]);
                     return $offers;
                 }
             }
@@ -60,8 +67,7 @@ class AllKeyShopScraper
         // Phase 2: Fall back to AllKeyShop search page
         Log::info('AllKeyShop: Direct slugs failed, trying search', ['query' => $query]);
         
-        $searchUrl = self::BASE_URL . '/search/' . urlencode(str_replace(' ', '-', strtolower($query))) . '/';
-        $searchHtml = $this->fetchPage($searchUrl);
+        $searchHtml = $this->fetchSearchPage($query);
         
         if (!$searchHtml) {
             Log::info('AllKeyShop: Search page failed', ['query' => $query]);
@@ -78,6 +84,56 @@ class AllKeyShopScraper
         }
         
         // Score links by relevance to query
+        $scoredLinks = $this->scoreLinks($links, $query);
+        
+        Log::info('AllKeyShop: Search results scored', [
+            'query' => $query,
+            'links_found' => count($links),
+            'top_result' => $scoredLinks[0]['slug'] ?? 'none',
+            'score' => $scoredLinks[0]['score'] ?? 0,
+        ]);
+        
+        // Try top 5 results (increased from 3)
+        foreach (array_slice($scoredLinks, 0, 5) as $item) {
+            $html = $this->fetchPage($item['link']);
+            if ($html) {
+                $offers = $this->parseOffers($html, $query);
+                if (!empty($offers)) {
+                    Log::info('AllKeyShop: Found via search fallback', [
+                        'query' => $query,
+                        'slug' => $item['slug'],
+                        'results' => count($offers),
+                    ]);
+                    return $offers;
+                }
+            }
+        }
+        
+        Log::info('AllKeyShop: No results from search fallback', [
+            'query' => $query,
+            'tried_links' => count($scoredLinks),
+        ]);
+        
+        return [];
+    }
+    
+    /**
+     * Fetch the AllKeyShop search page for a query
+     */
+    private function fetchSearchPage(string $query): ?string
+    {
+        // Build search URL - AllKeyShop uses /search/{slug}/
+        $searchSlug = $this->slugify($query);
+        $searchUrl = self::BASE_URL . '/search/' . $searchSlug . '/';
+        
+        return $this->fetchPage($searchUrl);
+    }
+    
+    /**
+     * Score search result links by relevance to query
+     */
+    private function scoreLinks(array $links, string $query): array
+    {
         $scoredLinks = [];
         $queryWords = array_filter(explode(' ', strtolower(preg_replace('/[^a-z0-9\s]/', '', $query))));
         
@@ -88,38 +144,52 @@ class AllKeyShopScraper
             }
             
             $score = 0;
+            $slugLower = strtolower($slug);
+            
             foreach ($queryWords as $word) {
-                if (strlen($word) > 2 && strpos($slug, $word) !== false) {
-                    $score++;
+                if (strlen($word) <= 2) continue;
+                
+                // Exact word match in slug
+                if (strpos($slugLower, $word) !== false) {
+                    $score += 10;
+                }
+                
+                // Partial match
+                similar_text($word, $slugLower, $percent);
+                if ($percent > 70) {
+                    $score += 5;
                 }
             }
             
-            $scoredLinks[] = ['link' => $link, 'score' => $score, 'slug' => $slug];
+            // Bonus for exact query match
+            if (strpos($slugLower, strtolower($query)) !== false) {
+                $score += 50;
+            }
+            
+            // Penalize unrelated words in slug that aren't in query
+            $slugWords = array_filter(explode(' ', $slugLower));
+            foreach ($slugWords as $word) {
+                if (strlen($word) > 3 && !in_array($word, $queryWords)) {
+                    $score -= 1; // Small penalty for extra words
+                }
+            }
+            
+            $scoredLinks[] = [
+                'link' => $link,
+                'score' => max(0, $score),
+                'slug' => $slug,
+            ];
         }
         
         // Sort by score descending
         usort($scoredLinks, fn ($a, $b) => $b['score'] <=> $a['score']);
         
-        Log::info('AllKeyShop: Search results scored', [
-            'query' => $query,
-            'top_result' => $scoredLinks[0]['slug'] ?? 'none',
-            'score' => $scoredLinks[0]['score'] ?? 0,
-        ]);
-        
-        // Try top 3 results
-        foreach (array_slice($scoredLinks, 0, 3) as $item) {
-            $html = $this->fetchPage($item['link']);
-            if ($html) {
-                $offers = $this->parseOffers($html, $query);
-                if (!empty($offers)) {
-                    return $offers;
-                }
-            }
-        }
-        
-        return [];
+        return $scoredLinks;
     }
     
+    /**
+     * Fetch a page from AllKeyShop
+     */
     private function fetchPage(string $url): ?string
     {
         try {
@@ -140,24 +210,30 @@ class AllKeyShopScraper
             if ($response->successful() && strlen($response->body()) > 5000) {
                 return $response->body();
             }
+            
+            Log::debug('AllKeyShop fetch non-success', [
+                'url' => $url,
+                'status' => $response->status(),
+                'length' => strlen($response->body()),
+            ]);
         } catch (\Throwable $e) {
-            Log::debug('AllKeyShop fetch failed', ['url' => $url, 'error' => $e->getMessage()]);
+            Log::debug('AllKeyShop fetch exception', [
+                'url' => $url,
+                'error' => $e->getMessage(),
+            ]);
         }
         
         return null;
     }
     
+    /**
+     * Generate multiple slug variants for a query
+     */
     private function generateSlugs(string $query): array
     {
         $slugs = [];
         
-        // Basic slugification
-        $basic = strtolower(trim($query));
-        $basic = preg_replace('/[^a-z0-9\s-]/', '', $basic);
-        $basic = preg_replace('/\s+/', '-', $basic);
-        $basic = preg_replace('/-+/', '-', $basic);
-        $basic = trim($basic, '-');
-        
+        $basic = $this->slugify($query);
         if ($basic) {
             $slugs[] = $basic;
         }
@@ -172,7 +248,7 @@ class AllKeyShopScraper
             $slugs[] = substr($basic, 4);
         }
         
-        // Common number variations
+        // Common number variations (Roman ↔ Arabic)
         $numberMap = [
             '1' => ['1', 'i', 'one'],
             '2' => ['2', 'ii', 'two'],
@@ -185,15 +261,18 @@ class AllKeyShopScraper
             '9' => ['9', 'ix', 'nine'],
         ];
         
-        // Try replacing numbers with Roman numerals and vice versa
         foreach ($numberMap as $num => $variants) {
             foreach ($variants as $from) {
                 foreach ($variants as $to) {
-                    if ($from !== $to && strpos($basic, '-' . $from . '-') !== false) {
-                        $slugs[] = str_replace('-' . $from . '-', '-' . $to . '-', $basic);
-                    }
-                    if ($from !== $to && strpos($basic, '-' . $from) !== false) {
-                        $slugs[] = str_replace('-' . $from, '-' . $to, $basic);
+                    if ($from !== $to) {
+                        // Replace surrounded by dashes
+                        if (strpos($basic, '-' . $from . '-') !== false) {
+                            $slugs[] = str_replace('-' . $from . '-', '-' . $to . '-', $basic);
+                        }
+                        // Replace at end
+                        if (substr($basic, -strlen('-' . $from)) === '-' . $from) {
+                            $slugs[] = substr($basic, 0, -strlen($from)) . $to;
+                        }
                     }
                 }
             }
@@ -218,14 +297,14 @@ class AllKeyShopScraper
             }
         }
         
-        // Common suffixes
-        $suffixes = ['', '-wild-hunt', '-game-of-the-year', '-goty', '-definitive', '-ultimate'];
-        $baseGame = preg_replace('/-(\d+|i+|wild-hunt|game-of-the-year|goty|definitive|ultimate).*$/', '', $basic);
+        // Common suffixes for games with numbers
+        $suffixes = ['', '-wild-hunt', '-game-of-the-year', '-goty', '-definitive', '-ultimate', '-complete', '-deluxe'];
+        $baseGame = preg_replace('/-(\d+|i+|wild-hunt|game-of-the-year|goty|definitive|ultimate|complete|deluxe|enhanced|remastered).*$/', '', $basic);
         
         if ($baseGame && $baseGame !== $basic) {
             foreach ($suffixes as $suffix) {
                 $candidate = $baseGame . $suffix;
-                if ($candidate !== $basic) {
+                if ($candidate !== $basic && !in_array($candidate, $slugs)) {
                     $slugs[] = $candidate;
                 }
             }
@@ -234,6 +313,23 @@ class AllKeyShopScraper
         return array_values(array_unique(array_filter($slugs)));
     }
     
+    /**
+     * Convert a string to a URL slug
+     */
+    private function slugify(string $text): string
+    {
+        $text = strtolower(trim($text));
+        $text = preg_replace('/[^a-z0-9\s-]/', '', $text);
+        $text = preg_replace('/\s+/', '-', $text);
+        $text = preg_replace('/-+/', '-', $text);
+        $text = trim($text, '-');
+        
+        return $text;
+    }
+    
+    /**
+     * Parse offers from AllKeyShop product page HTML
+     */
     private function parseOffers(string $html, string $query): array
     {
         $products = [];
@@ -321,6 +417,9 @@ class AllKeyShopScraper
         return $products;
     }
     
+    /**
+     * Map AllKeyShop seller names to standard store names
+     */
     private function mapStoreName(string $seller): string
     {
         $mapping = [
@@ -331,6 +430,9 @@ class AllKeyShopScraper
             'Eneba' => 'Eneba',
             'Instant Gaming' => 'Instant Gaming',
             'Gamesplanet' => 'Gamesplanet',
+            'Gamesplanet US' => 'Gamesplanet',
+            'Gamesplanet UK' => 'Gamesplanet',
+            'Gamesplanet FR' => 'Gamesplanet',
             'CDKeys' => 'CDKeys',
             'Humble Store' => 'Humble Store',
             'Steam' => 'Steam',
@@ -338,6 +440,23 @@ class AllKeyShopScraper
             'Gog.com' => 'GOG',
             'K4G' => 'K4G',
             'GAMESEAL' => 'GAMESEAL',
+            'Driffle' => 'Driffle',
+            '2Game' => '2Game',
+            '2Game EU' => '2Game',
+            'Voidu' => 'Voidu',
+            'Fanatical' => 'Fanatical',
+            'Green Man Gaming' => 'Green Man Gaming',
+            'DLGamer' => 'DLGamer',
+            'GamersGate' => 'GamersGate',
+            'Noctre' => 'Noctre',
+            'Dreamgame' => 'Dreamgame',
+            'HRK Game' => 'HRK Game',
+            'Yuplay' => 'Yuplay',
+            'Play-Asia' => 'Play-Asia',
+            'JoyBuggy' => 'JoyBuggy',
+            'Eneba EU' => 'Eneba',
+            'Eneba US' => 'Eneba',
+            'Eneba UK' => 'Eneba',
         ];
         
         return $mapping[$seller] ?? $seller;
