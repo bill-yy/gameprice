@@ -34,28 +34,3 @@ Route::prefix('v1')->group(function () {
         Route::delete('/keys/{id}', [ApiDashboardController::class, 'revokeKey']);
     });
 });
-
-// TEMP: Debug ITAD store coverage
-Route::get('/admin/itad-stores', function () {
-    $scraper = new \App\Services\Scrapers\IsThereAnyDealScraper();
-    if (!$scraper->isConfigured()) {
-        return response()->json(['error' => 'ITAD not configured'], 500);
-    }
-    
-    $shops = $scraper->getShops();
-    $shopNames = array_map(fn($s) => $s['name'], $shops);
-    
-    $target = ['Kinguin', 'G2A', 'Gamivo', 'Gamesplanet', 'G2A.COM', 'G2A Plus', 'Kinguin.net'];
-    $found = array_filter($shopNames, fn($name) => 
-        stripos($name, 'kinguin') !== false ||
-        stripos($name, 'g2a') !== false ||
-        stripos($name, 'gamivo') !== false ||
-        stripos($name, 'gamesplanet') !== false
-    );
-    
-    return response()->json([
-        'total_shops' => count($shops),
-        'matching_shops' => array_values($found),
-        'all_shops' => array_values($shopNames),
-    ]);
-})->middleware([ApiKeyMiddleware::class, RateLimitMiddleware::class]);
