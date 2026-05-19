@@ -70,15 +70,15 @@ class IsThereAnyDealScraper
     private function lookupGame(string $title): ?string
     {
         $url = $this->baseUrl . '/games/search/v1';
-        $response = Http::withHeaders([
-            'ITAD-API-Key' => $this->apiKey,
-        ])->timeout(10)->get($url, [
+        // ITAD requires key as query param, header ITAD-API-Key returns 403
+        $response = Http::timeout(10)->get($url, [
+            'key' => $this->apiKey,
             'title' => $title,
             'limit' => 5,
         ]);
 
         if (! $response->successful()) {
-            Log::warning('ITAD lookup failed', ['status' => $response->status()]);
+            Log::warning('ITAD lookup failed', ['status' => $response->status(), 'body' => $response->body()]);
 
             return null;
         }
@@ -118,16 +118,13 @@ class IsThereAnyDealScraper
     private function getPrices(string $gameId): array
     {
         $url = $this->baseUrl . '/games/prices/v2';
-        $response = Http::withHeaders([
-            'ITAD-API-Key' => $this->apiKey,
-        ])->timeout(10)->get($url, [
-            'id' => $gameId,
-            'region' => 'eu1',      // European region
-            'country' => 'ES',       // Spain
-        ]);
+        // ITAD prices v2 requires POST with JSON body
+        $response = Http::timeout(10)->withHeaders([
+            'Content-Type' => 'application/json',
+        ])->post($url . '?region=eu1&country=ES&key=' . $this->apiKey, [$gameId]);
 
         if (! $response->successful()) {
-            Log::warning('ITAD prices failed', ['status' => $response->status()]);
+            Log::warning('ITAD prices failed', ['status' => $response->status(), 'body' => $response->body()]);
 
             return [];
         }
@@ -135,29 +132,34 @@ class IsThereAnyDealScraper
         $data = $response->json();
         $results = [];
 
-        foreach ($data as $deal) {
-            $price = $deal['price']['amount'] ?? null;
-            if ($price === null) {
-                continue;
+        // Response is an array of objects with 'id' and 'deals'
+        foreach ($data as $gameData) {
+            $deals = $gameData['deals'] ?? [];
+
+            foreach ($deals as $deal) {
+                $price = $deal['price']['amount'] ?? null;
+                if ($price === null) {
+                    continue;
+                }
+
+                $regularPrice = $deal['regular']['amount'] ?? null;
+                $cut = $deal['cut'] ?? 0;
+                $storeName = $deal['shop']['name'] ?? 'Unknown';
+                $storeSlug = $deal['shop']['slug'] ?? $this->slugify($storeName);
+                $dealUrl = $deal['url'] ?? '';
+                $drm = $deal['drm'] ?? [];
+                $drmName = is_array($drm) && ! empty($drm) ? ($drm[0]['name'] ?? null) : null;
+
+                $results[] = [
+                    'store' => $storeName,
+                    'store_slug' => $storeSlug,
+                    'price_eur' => $price,
+                    'original_price_eur' => $regularPrice,
+                    'discount_percent' => $cut,
+                    'url' => $dealUrl,
+                    'drm' => $drmName,
+                ];
             }
-
-            $regularPrice = $deal['regular']['amount'] ?? null;
-            $cut = $deal['cut'] ?? 0;
-            $storeName = $deal['shop']['name'] ?? 'Unknown';
-            $storeSlug = $deal['shop']['slug'] ?? $this->slugify($storeName);
-            $dealUrl = $deal['url'] ?? '';
-            $drm = $deal['drm'] ?? [];
-            $drmName = is_array($drm) && ! empty($drm) ? ($drm[0]['name'] ?? null) : null;
-
-            $results[] = [
-                'store' => $storeName,
-                'store_slug' => $storeSlug,
-                'price_eur' => $price,
-                'original_price_eur' => $regularPrice,
-                'discount_percent' => $cut,
-                'url' => $dealUrl,
-                'drm' => $drmName,
-            ];
         }
 
         return $results;
@@ -175,9 +177,9 @@ class IsThereAnyDealScraper
         }
 
         try {
-            $response = Http::withHeaders([
-                'ITAD-API-Key' => $this->apiKey,
-            ])->timeout(10)->get($this->baseUrl . '/shops/v1');
+            $response = Http::timeout(10)->get($this->baseUrl . '/shops/v1', [
+                'key' => $this->apiKey,
+            ]);
 
             if (! $response->successful()) {
                 return [];
