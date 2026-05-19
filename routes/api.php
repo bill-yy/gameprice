@@ -34,3 +34,26 @@ Route::prefix('v1')->group(function () {
         Route::delete('/keys/{id}', [ApiDashboardController::class, 'revokeKey']);
     });
 });
+
+// TEMP: Debug ITAD store coverage
+Route::get('/admin/itad-stores', function () {
+    $scraper = new \App\Services\Scrapers\IsThereAnyDealScraper();
+    if (!$scraper->isConfigured()) {
+        return response()->json(['error' => 'ITAD not configured'], 500);
+    }
+    
+    $results = $scraper->search('The Witcher 3');
+    $stores = [];
+    foreach ($results as $r) {
+        $stores[$r['store']] = $r['price_eur'];
+    }
+    
+    return response()->json([
+        'stores' => $stores,
+        'count' => count($stores),
+        'has_kinguin' => isset($stores['Kinguin']),
+        'has_g2a' => isset($stores['G2A']),
+        'has_gamivo' => isset($stores['Gamivo']),
+        'has_gamesplanet' => isset($stores['Gamesplanet']),
+    ]);
+})->middleware([ApiKeyMiddleware::class, RateLimitMiddleware::class]);
