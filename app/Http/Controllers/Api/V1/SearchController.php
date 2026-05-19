@@ -78,18 +78,31 @@ class SearchController extends Controller
                     
                     $results = $scraper->searchAll($query);
                     
-                    // Filter out irrelevant results (results that don't contain query words)
-                    $filtered = array_filter($results, function ($r) use ($queryWords) {
+                    // Filter out irrelevant results using word-boundary matching
+                    $filtered = array_filter($results, function ($r) use ($queryWords, $query) {
                         $name = strtolower($r['name'] ?? '');
-                        // Must contain at least one significant query word (>2 chars)
+                        
+                        // Build regex with word boundaries for each significant query word
                         $matchCount = 0;
-                        foreach ($queryWords as $word) {
-                            if (strlen($word) > 2 && strpos($name, $word) !== false) {
+                        $significantWords = array_filter($queryWords, fn($w) => strlen($w) >= 3);
+                        
+                        foreach ($significantWords as $word) {
+                            // Use word boundary matching to avoid substring matches
+                            // e.g. "gta" should NOT match "Bogtavern"
+                            if (preg_match('/\b' . preg_quote($word, '/') . '\b/', $name)) {
                                 $matchCount++;
                             }
                         }
-                        // Require at least one match OR if query is very short
-                        return $matchCount > 0 || count($queryWords) === 0;
+                        
+                        // Require at least half of significant words to match (minimum 1)
+                        $requiredMatches = max(1, ceil(count($significantWords) / 2));
+                        
+                        // For very short queries (all words < 3 chars), use simple contains
+                        if (empty($significantWords)) {
+                            return true; // Query is too short to filter meaningfully
+                        }
+                        
+                        return $matchCount >= $requiredMatches;
                     });
                     
                     $allResults = array_merge($allResults, array_values($filtered));
@@ -188,6 +201,24 @@ class SearchController extends Controller
 
         // Filtrar precios 0
         $results = array_filter($results, fn ($r) => ($r['price'] ?? 0) > 0);
+
+        // Filter irrelevant results using same logic as searchAll
+        $queryWords = array_filter(explode(' ', strtolower(preg_replace('/[^a-z0-9\s]/', '', $query))));
+        $significantWords = array_filter($queryWords, fn($w) => strlen($w) >= 3);
+        
+        if (!empty($significantWords)) {
+            $requiredMatches = max(1, ceil(count($significantWords) / 2));
+            $results = array_filter($results, function ($r) use ($significantWords, $requiredMatches) {
+                $name = strtolower($r['name'] ?? '');
+                $matchCount = 0;
+                foreach ($significantWords as $word) {
+                    if (preg_match('/\b' . preg_quote($word, '/') . '\b/', $name)) {
+                        $matchCount++;
+                    }
+                }
+                return $matchCount >= $requiredMatches;
+            });
+        }
 
         // Get suggestions if very few results
         $suggestions = [];
