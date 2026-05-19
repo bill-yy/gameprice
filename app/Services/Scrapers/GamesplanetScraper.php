@@ -6,6 +6,9 @@ use Illuminate\Support\Facades\Log;
 
 class GamesplanetScraper
 {
+    private const BASE_URL = 'https://us.gamesplanet.com';
+    private const USD_TO_EUR_RATE = 0.92;
+
     public static function getStoreName(): string
     {
         return 'Gamesplanet';
@@ -73,12 +76,12 @@ class GamesplanetScraper
 
     private function searchGamesplanet(string $query): array
     {
-        $response = ScraperProxy::get('https://us.gamesplanet.com/api/products/search', [
-            'q' => $query,
+        $response = ScraperProxy::get(self::BASE_URL . '/search', [
+            'query' => $query,
         ], [
             'headers' => [
-                'Accept' => 'application/json',
-                'Referer' => 'https://us.gamesplanet.com/',
+                'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Referer' => self::BASE_URL . '/',
             ],
             'timeout' => 30,
         ]);
@@ -94,80 +97,101 @@ class GamesplanetScraper
             return [];
         }
 
-        $data = $response->json();
-
-        return $this->parseProducts($data, $query);
+        return $this->parseHtmlProducts($response->body());
     }
 
-    private function parseProducts(array $data, string $query): array
+    private function parseHtmlProducts(string $html): array
     {
         $products = [];
 
-        $items = $data['products']
-            ?? $data['data']
-            ?? $data['items']
-            ?? $data['results']
-            ?? [];
+        // Match product rows: game_list game_list_small
+        preg_match_all(
+            '/<div[^>]*class="[^"]*game_list[^"]*"[^>]*>.*?<\/div>\s*<\/div>\s*<\/div>/s',
+            $html,
+            $matches,
+            PREG_SET_ORDER
+        );
 
-        if (! is_array($items)) {
-            return [];
-        }
+        foreach ($matches as $match) {
+            $block = $match[0];
 
-        foreach ($items as $item) {
-            $name = $item['name'] ?? $item['title'] ?? null;
+            // Extract title from h4 > a or img alt
+            $name = null;
+            if (preg_match('/<h4[^>]*>.*?<a[^>]*>([^<]+)<\/a>/s', $block, $nameMatch)) {
+                $name = trim($nameMatch[1]);
+            } elseif (preg_match('/<img[^>]*alt="([^"]*)"/', $block, $imgMatch)) {
+                $name = trim($imgMatch[1]);
+            }
+
             if (! $name) {
                 continue;
             }
 
-            $price = $item['price'] ?? $item['currentPrice'] ?? $item['final_price'] ?? null;
-            if (is_array($price)) {
-                $price = $price['amount'] ?? $price['value'] ?? $price['eur'] ?? null;
+            // Extract link
+            $url = null;
+            if (preg_match('/href="(\/game\/[^"]+)"/', $block, $linkMatch)) {
+                $url = self::BASE_URL . $linkMatch[1];
             }
-            if ($price === null) {
+
+            // Extract current price
+            $price = null;
+            if (preg_match('/<span[^>]*class="[^"]*price_current[^"]*"[^>]*>([^<]+)<\/span>/', $block, $priceMatch)) {
+                $priceStr = trim($priceMatch[1]);
+                $price = $this->parsePrice($priceStr);
+            }
+
+            if ($price === null || $price <= 0) {
                 continue;
             }
-            $price = (float) $price;
 
-            $originalPrice = $item['originalPrice'] ?? $item['basePrice'] ?? $item['msrp'] ?? $item['regular_price'] ?? null;
-            if (is_array($originalPrice)) {
-                $originalPrice = $originalPrice['amount'] ?? $originalPrice['value'] ?? $originalPrice['eur'] ?? null;
+            // Extract original/base price if exists
+            $originalPrice = null;
+            if (preg_match('/<span[^>]*class="[^"]*price_base[^"]*"[^>]*>([^<]+)<\/span>/', $block, $baseMatch)) {
+                $originalPrice = $this->parsePrice(trim($baseMatch[1]));
             }
-            $originalPrice = $originalPrice !== null ? (float) $originalPrice : $price;
+            if ($originalPrice === null || $originalPrice <= 0) {
+                $originalPrice = $price;
+            }
 
-            $discount = $item['discount'] ?? $item['discountPercent'] ?? $item['discount_percent'] ?? null;
-            if ($discount === null && $originalPrice > 0 && $originalPrice > $price) {
+            // Calculate discount
+            $discount = 0;
+            if ($originalPrice > $price && $originalPrice > 0) {
                 $discount = (int) round((1 - $price / $originalPrice) * 100);
             }
-            $discount = (int) ($discount ?? 0);
 
-            $slug = $item['slug'] ?? $item['id'] ?? null;
-            $url = $item['url'] ?? null;
-            if (! $url && $slug) {
-                $url = "https://us.gamesplanet.com/product/{$slug}";
-            }
-            if (! $url) {
-                $url = "https://us.gamesplanet.com/search?query=" . urlencode($query);
-            }
-
+            // Extract region info from URL or title
             $region = 'global';
-            if (isset($item['region']) && is_string($item['region'])) {
-                $region = strtolower($item['region']);
-            } elseif (isset($item['territory']) && is_string($item['territory'])) {
-                $region = strtolower($item['territory']);
+            if (stripos($name, 'Steam') !== false) {
+                $region = 'global'; // Steam keys are typically global on Gamesplanet
             }
 
             $products[] = [
                 'name' => $name,
-                'price_eur' => $price,
-                'original_price_eur' => $originalPrice,
+                'price_eur' => $this->usdToEur($price),
+                'original_price_eur' => $this->usdToEur($originalPrice),
                 'discount_percent' => $discount,
-                'url' => $url,
+                'url' => $url ?? self::BASE_URL,
                 'region' => $region,
-                'in_stock' => $item['inStock'] ?? $item['available'] ?? $item['isAvailable'] ?? true,
+                'in_stock' => true, // Gamesplanet shows available products
             ];
         }
 
         return $products;
+    }
+
+    private function parsePrice(string $priceStr): ?float
+    {
+        // Remove currency symbol and whitespace, handle commas
+        $cleaned = preg_replace('/[^\d.,]/', '', $priceStr);
+        $cleaned = str_replace(',', '', $cleaned); // Remove thousand separators
+        
+        $value = (float) $cleaned;
+        return $value > 0 ? $value : null;
+    }
+
+    private function usdToEur(float $usd): float
+    {
+        return round($usd * self::USD_TO_EUR_RATE, 2);
     }
 
     private function findBestMatch(array $results, string $gameTitle): ?array
