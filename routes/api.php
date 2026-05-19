@@ -2,6 +2,7 @@
 
 use App\Http\Middleware\ApiKeyMiddleware;
 use App\Http\Middleware\RateLimitMiddleware;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\V1\SearchController;
 use App\Http\Controllers\Api\V1\StoreController;
@@ -11,6 +12,25 @@ use App\Http\Controllers\Api\V1\Admin\ApiDashboardController;
 
 Route::get('/health', fn () => response()->json(['status' => 'ok', 'version' => '1.0.1']))
     ->withoutMiddleware([ApiKeyMiddleware::class, RateLimitMiddleware::class]);
+
+Route::get('/debug-allkeyshop', function () {
+    $url = 'https://www.allkeyshop.com/blog/buy-the-witcher-3-wild-hunt-cd-key-compare-prices/';
+    
+    $response = Http::withHeaders([
+        'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language' => 'en-US,en;q=0.5',
+        'Referer' => 'https://www.google.com/',
+    ])->timeout(20)->get($url);
+    
+    return response()->json([
+        'status' => $response->status(),
+        'body_length' => strlen($response->body()),
+        'has_jsonld' => str_contains($response->body(), 'application/ld+json'),
+        'has_offers' => str_contains($response->body(), '"offers"'),
+        'first_500_chars' => substr($response->body(), 0, 500),
+    ]);
+})->withoutMiddleware([ApiKeyMiddleware::class, RateLimitMiddleware::class]);
 
 Route::get('/', [LandingController::class, 'index'])
     ->withoutMiddleware([ApiKeyMiddleware::class, RateLimitMiddleware::class]);
