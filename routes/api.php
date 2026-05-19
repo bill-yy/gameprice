@@ -9,8 +9,28 @@ use App\Http\Controllers\Api\V1\WebhookController;
 use App\Http\Controllers\Api\V1\LandingController;
 use App\Http\Controllers\Api\V1\Admin\ApiDashboardController;
 
-Route::get('/health', fn () => response()->json(['status' => 'ok', 'version' => '1.0.1']))
-    ->withoutMiddleware([ApiKeyMiddleware::class, RateLimitMiddleware::class]);
+Route::get('/health', function () {
+    $stores = array_keys([
+        'eneba' => 1, 'instant-gaming' => 1, 'cheapshark' => 1,
+        'g2a' => 1, 'kinguin' => 1, 'gamivo' => 1,
+        'gamesplanet' => 1, 'allkeyshop' => 1,
+        'cdkeys' => 1, 'psn-store' => 1, 'xbox-store' => 1,
+    ]);
+    
+    $health = \App\Services\ScraperMonitor::getHealth($stores);
+    $alerts = \App\Services\ScraperMonitor::getAlerts($stores);
+    
+    $downStores = array_filter($health, fn ($h) => $h['status'] === 'down');
+    $overallStatus = count($downStores) > 0 ? 'degraded' : 'ok';
+    
+    return response()->json([
+        'status' => $overallStatus,
+        'version' => '1.0.2',
+        'scrapers' => $health,
+        'alerts' => $alerts,
+        'timestamp' => now()->toIso8601String(),
+    ]);
+})->withoutMiddleware([ApiKeyMiddleware::class, RateLimitMiddleware::class]);
 
 Route::get('/', [LandingController::class, 'index'])
     ->withoutMiddleware([ApiKeyMiddleware::class, RateLimitMiddleware::class]);

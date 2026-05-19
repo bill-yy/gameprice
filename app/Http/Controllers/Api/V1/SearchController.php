@@ -13,6 +13,7 @@ use App\Services\Scrapers\InstantGamingScraper;
 use App\Services\Scrapers\KinguinScraper;
 use App\Services\Scrapers\PSNStoreScraper;
 use App\Services\Scrapers\XboxStoreScraper;
+use App\Services\ScraperMonitor;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -52,17 +53,19 @@ class SearchController extends Controller
             $allResults = [];
             $storesSearched = 0;
 
-            foreach (self::SCRAPERS as $scraperClass) {
+            foreach (self::SCRAPERS as $storeKey => $scraperClass) {
                 try {
                     $scraper = new $scraperClass();
                     $results = $scraper->searchAll($query);
                     $allResults = array_merge($allResults, $results);
                     $storesSearched++;
+                    ScraperMonitor::recordSuccess($storeKey, count($results));
                 } catch (\Throwable $e) {
                     Log::warning("Scraper {$scraperClass} failed", [
                         'query' => $query,
                         'error' => $e->getMessage(),
                     ]);
+                    ScraperMonitor::recordFailure($storeKey, $e->getMessage());
                     $storesSearched++;
                 }
             }
