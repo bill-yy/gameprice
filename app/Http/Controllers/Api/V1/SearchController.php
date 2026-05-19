@@ -6,6 +6,8 @@ use App\Services\Scrapers\CDKeysScraper;
 use App\Services\Scrapers\CheapSharkScraper;
 use App\Services\Scrapers\EnebaScraper;
 use App\Services\Scrapers\G2AScraper;
+use App\Services\Scrapers\GamivoScraper;
+use App\Services\Scrapers\GamesplanetScraper;
 use App\Services\Scrapers\InstantGamingScraper;
 use App\Services\Scrapers\KinguinScraper;
 use App\Services\Scrapers\PSNStoreScraper;
@@ -23,6 +25,8 @@ class SearchController extends Controller
         'cheapshark' => CheapSharkScraper::class,
         'g2a' => G2AScraper::class,
         'kinguin' => KinguinScraper::class,
+        'gamivo' => GamivoScraper::class,
+        'gamesplanet' => GamesplanetScraper::class,
         'cdkeys' => CDKeysScraper::class,
         'psn-store' => PSNStoreScraper::class,
         'xbox-store' => XboxStoreScraper::class,

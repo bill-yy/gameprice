@@ -1,0 +1,6 @@
+name = "gameprice-scrape-proxy"
+main = "index.js"
+compatibility_date = "2026-05-19"
+
+# Free plan limits: 100,000 requests/day
+# This should be plenty for our scraping needs (even with 8 scrapers × 50 games = 400 requests)

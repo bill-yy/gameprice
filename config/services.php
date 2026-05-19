@@ -39,4 +39,8 @@ return [
         'api_key' => env('ITAD_API_KEY'),
     ],
 
+    'cloudflare' => [
+        'worker_url' => env('CLOUDFLARE_WORKER_URL'),
+    ],
+
 ];

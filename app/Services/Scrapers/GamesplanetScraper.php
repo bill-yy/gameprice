@@ -2,20 +2,19 @@
 
 namespace App\Services\Scrapers;
 
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
-class G2AScraper
+class GamesplanetScraper
 {
     public static function getStoreName(): string
     {
-        return 'G2A';
+        return 'Gamesplanet';
     }
 
     public function searchAll(string $query): array
     {
         try {
-            $results = $this->searchG2A($query);
+            $results = $this->searchGamesplanet($query);
 
             return array_map(fn ($r) => [
                 'store' => self::getStoreName(),
@@ -27,10 +26,9 @@ class G2AScraper
                 'url' => $r['url'],
                 'in_stock' => $r['in_stock'],
                 'platform' => 'PC',
-                'region' => $r['region'] ?? 'global',
             ], $results);
         } catch (\Throwable $e) {
-            Log::warning('G2A scraper failed', [
+            Log::warning('Gamesplanet scraper failed', [
                 'query' => $query,
                 'error' => $e->getMessage(),
             ]);
@@ -42,7 +40,7 @@ class G2AScraper
     public function search(string $query): ?array
     {
         try {
-            $searchResults = $this->searchG2A($query);
+            $searchResults = $this->searchGamesplanet($query);
 
             if (empty($searchResults)) {
                 return null;
@@ -50,7 +48,7 @@ class G2AScraper
 
             $bestMatch = $this->findBestMatch($searchResults, $query);
 
-            if (!$bestMatch) {
+            if (! $bestMatch) {
                 return null;
             }
 
@@ -64,7 +62,7 @@ class G2AScraper
                 'in_stock' => $bestMatch['in_stock'],
             ];
         } catch (\Throwable $e) {
-            Log::warning('G2A scraper failed', [
+            Log::warning('Gamesplanet scraper failed', [
                 'query' => $query,
                 'error' => $e->getMessage(),
             ]);
@@ -73,34 +71,26 @@ class G2AScraper
         }
     }
 
-    private function searchG2A(string $query): array
+    private function searchGamesplanet(string $query): array
     {
-        $response = ScraperProxy::post('https://www.g2a.com/search/api/v3/products', [
-            'itemsPerPage' => 24,
-            'include' => 'categories,categoryTree,media,regions,attributes,developerName,publisherName,discount',
-            'updatedAfter' => null,
-            'sort' => 'score',
-            'isWholesale' => false,
-            'funnel' => 'r',
-            'phrase' => $query,
+        $response = ScraperProxy::get('https://us.gamesplanet.com/api/products/search', [
+            'q' => $query,
         ], [
             'headers' => [
                 'Accept' => 'application/json',
-                'Accept-Language' => 'en-US,en;q=0.9',
-                'Referer' => 'https://www.g2a.com/',
-                'Origin' => 'https://www.g2a.com',
+                'Referer' => 'https://us.gamesplanet.com/',
             ],
             'timeout' => 30,
         ]);
 
-        Log::info('Scraper g2a: result', [
+        Log::info('Scraper gamesplanet: result', [
             'game' => $query,
             'success' => $response->successful(),
             'http_status' => $response->status(),
             'response_size' => strlen($response->body()),
         ]);
 
-        if (!$response->successful()) {
+        if (! $response->successful()) {
             return [];
         }
 
@@ -113,63 +103,57 @@ class G2AScraper
     {
         $products = [];
 
-        $items = $data['data']['products']
-            ?? $data['products']
-            ?? $data['data']['items']
+        $items = $data['products']
+            ?? $data['data']
             ?? $data['items']
+            ?? $data['results']
             ?? [];
 
-        if (isset($items['hits'])) {
-            $items = $items['hits'];
-        }
-        if (isset($items['edges'])) {
-            $items = array_column($items, 'node');
-        }
-
-        if (!is_array($items) || !array_is_list($items)) {
+        if (! is_array($items)) {
             return [];
         }
 
         foreach ($items as $item) {
             $name = $item['name'] ?? $item['title'] ?? null;
-            if (!$name) {
+            if (! $name) {
                 continue;
             }
 
-            $price = $item['minPrice'] ?? $item['price'] ?? $item['currentPrice'] ?? null;
+            $price = $item['price'] ?? $item['currentPrice'] ?? $item['final_price'] ?? null;
             if (is_array($price)) {
-                $price = $price['amount'] ?? $price['value'] ?? null;
+                $price = $price['amount'] ?? $price['value'] ?? $price['eur'] ?? null;
             }
             if ($price === null) {
                 continue;
             }
             $price = (float) $price;
 
-            $originalPrice = $item['maxPrice'] ?? $item['originalPrice'] ?? $item['basePrice'] ?? $item['msrp'] ?? null;
+            $originalPrice = $item['originalPrice'] ?? $item['basePrice'] ?? $item['msrp'] ?? $item['regular_price'] ?? null;
             if (is_array($originalPrice)) {
-                $originalPrice = $originalPrice['amount'] ?? $originalPrice['value'] ?? null;
+                $originalPrice = $originalPrice['amount'] ?? $originalPrice['value'] ?? $originalPrice['eur'] ?? null;
             }
             $originalPrice = $originalPrice !== null ? (float) $originalPrice : $price;
 
-            $discount = $item['discount'] ?? $item['discountPercent'] ?? null;
+            $discount = $item['discount'] ?? $item['discountPercent'] ?? $item['discount_percent'] ?? null;
             if ($discount === null && $originalPrice > 0 && $originalPrice > $price) {
                 $discount = (int) round((1 - $price / $originalPrice) * 100);
             }
             $discount = (int) ($discount ?? 0);
 
             $slug = $item['slug'] ?? $item['id'] ?? null;
-            $url = $slug ? "https://www.g2a.com/{$slug}" : ($item['url'] ?? "https://www.g2a.com/search?query=" . urlencode($query));
+            $url = $item['url'] ?? null;
+            if (! $url && $slug) {
+                $url = "https://us.gamesplanet.com/product/{$slug}";
+            }
+            if (! $url) {
+                $url = "https://us.gamesplanet.com/search?query=" . urlencode($query);
+            }
 
             $region = 'global';
             if (isset($item['region']) && is_string($item['region'])) {
                 $region = strtolower($item['region']);
-            } elseif (isset($item['regions']) && is_array($item['regions'])) {
-                $regionNames = array_map('strtolower', $item['regions']);
-                if (in_array('global', $regionNames)) {
-                    $region = 'global';
-                } elseif (!empty($regionNames)) {
-                    $region = $regionNames[0];
-                }
+            } elseif (isset($item['territory']) && is_string($item['territory'])) {
+                $region = strtolower($item['territory']);
             }
 
             $products[] = [
@@ -179,7 +163,7 @@ class G2AScraper
                 'discount_percent' => $discount,
                 'url' => $url,
                 'region' => $region,
-                'in_stock' => $item['inStock'] ?? $item['available'] ?? true,
+                'in_stock' => $item['inStock'] ?? $item['available'] ?? $item['isAvailable'] ?? true,
             ];
         }
 
@@ -209,13 +193,6 @@ class G2AScraper
             }
             if (stripos($b['name'], 'Steam') !== false || stripos($b['name'], 'PC') !== false) {
                 $bScore += 5;
-            }
-
-            if ($a['region'] === 'global') {
-                $aScore += 3;
-            }
-            if ($b['region'] === 'global') {
-                $bScore += 3;
             }
 
             return $bScore <=> $aScore;
