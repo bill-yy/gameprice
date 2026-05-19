@@ -121,7 +121,7 @@ class GamesplanetScraper
             if (!$name) {
                 $pos = strpos($html, $match[0]);
                 if ($pos !== false) {
-                    $nearby = substr($html, $pos, 500);
+                    $nearby = substr($html, max(0, $pos - 200), 700);
                     if (preg_match('/<h[1-6][^>]*>.*?<a[^>]*>([^<]+)<\/a>/s', $nearby, $titleMatch)) {
                         $name = trim($titleMatch[1]);
                     }
@@ -136,8 +136,8 @@ class GamesplanetScraper
             $pos = strpos($html, $match[0]);
             $price = null;
             if ($pos !== false) {
-                // Search in next 800 chars for price_current
-                $nearby = substr($html, $pos, 800);
+                // Search in next 1500 chars for price_current
+                $nearby = substr($html, $pos, 1500);
                 if (preg_match('/<span[^>]*class="[^"]*price_current[^"]*"[^>]*>([^<]+)<\/span>/', $nearby, $priceMatch)) {
                     $price = $this->parsePrice(trim($priceMatch[1]));
                 }
@@ -150,7 +150,7 @@ class GamesplanetScraper
             // Check for original/base price
             $originalPrice = null;
             if ($pos !== false) {
-                $nearby = substr($html, $pos, 800);
+                $nearby = substr($html, $pos, 1500);
                 if (preg_match('/<span[^>]*class="[^"]*price_base[^"]*"[^>]*>([^<]+)<\/span>/', $nearby, $baseMatch)) {
                     $originalPrice = $this->parsePrice(trim($baseMatch[1]));
                 }
