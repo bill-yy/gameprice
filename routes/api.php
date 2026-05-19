@@ -42,18 +42,20 @@ Route::get('/admin/itad-stores', function () {
         return response()->json(['error' => 'ITAD not configured'], 500);
     }
     
-    $results = $scraper->search('The Witcher 3');
-    $stores = [];
-    foreach ($results as $r) {
-        $stores[$r['store']] = $r['price_eur'];
-    }
+    $shops = $scraper->getShops();
+    $shopNames = array_map(fn($s) => $s['name'], $shops);
+    
+    $target = ['Kinguin', 'G2A', 'Gamivo', 'Gamesplanet', 'G2A.COM', 'G2A Plus', 'Kinguin.net'];
+    $found = array_filter($shopNames, fn($name) => 
+        stripos($name, 'kinguin') !== false ||
+        stripos($name, 'g2a') !== false ||
+        stripos($name, 'gamivo') !== false ||
+        stripos($name, 'gamesplanet') !== false
+    );
     
     return response()->json([
-        'stores' => $stores,
-        'count' => count($stores),
-        'has_kinguin' => isset($stores['Kinguin']),
-        'has_g2a' => isset($stores['G2A']),
-        'has_gamivo' => isset($stores['Gamivo']),
-        'has_gamesplanet' => isset($stores['Gamesplanet']),
+        'total_shops' => count($shops),
+        'matching_shops' => array_values($found),
+        'all_shops' => array_values($shopNames),
     ]);
 })->middleware([ApiKeyMiddleware::class, RateLimitMiddleware::class]);
