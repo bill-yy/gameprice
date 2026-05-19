@@ -35,25 +35,6 @@ Route::get('/health', function () {
 Route::get('/', [LandingController::class, 'index'])
     ->withoutMiddleware([ApiKeyMiddleware::class, RateLimitMiddleware::class]);
 
-// TEMPORARY: Remote artisan execution — REMOVE AFTER USE
-Route::post('/admin/run-command', function () {
-    $command = request('command');
-    $params = request('params', []);
-    
-    \Illuminate\Support\Facades\Log::info('Remote artisan triggered', [
-        'command' => $command,
-        'params' => $params,
-    ]);
-    
-    $exitCode = \Illuminate\Support\Facades\Artisan::call($command, $params);
-    
-    return response()->json([
-        'success' => $exitCode === 0,
-        'exit_code' => $exitCode,
-        'output' => \Illuminate\Support\Facades\Artisan::output(),
-    ]);
-})->middleware([ApiKeyMiddleware::class]);
-
 Route::prefix('v1')->group(function () {
     Route::get('/search', [SearchController::class, 'searchAll']);
     Route::get('/prices/{store}', [SearchController::class, 'searchByStore']);
