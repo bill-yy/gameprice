@@ -57,3 +57,20 @@ Route::post('/admin/run-scraper', function () {
         'output' => Artisan::output(),
     ]);
 })->middleware([ApiKeyMiddleware::class, RateLimitMiddleware::class]);
+
+// Temporary debug endpoint — REMOVE AFTER VERIFICATION
+Route::get('/admin/check-real-prices', function () {
+    $totalProducts = \App\Models\Product::count();
+    $realProducts = \App\Models\Product::where('is_real_price', true)->count();
+    $sample = \App\Models\Product::where('is_real_price', true)
+        ->with('store', 'game')
+        ->limit(5)
+        ->get(['id', 'game_id', 'store_id', 'current_price', 'original_price', 'is_real_price', 'url']);
+    
+    return response()->json([
+        'success' => true,
+        'total_products' => $totalProducts,
+        'real_products' => $realProducts,
+        'sample' => $sample,
+    ]);
+})->middleware([ApiKeyMiddleware::class, RateLimitMiddleware::class]);
