@@ -74,39 +74,7 @@ class XboxStoreScraper
 
     private function searchXbox(string $query): array
     {
-        $response = Http::withHeaders([
-            'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-            'Accept' => 'application/json',
-            'Accept-Language' => 'en-US,en;q=0.9',
-            'MS-CV' => bin2hex(random_bytes(16)),
-        ])->timeout(5)->get('https://displaycatalog.mp.microsoft.com/v7.0/products', [
-            'market' => 'ES',
-            'languages' => 'en-US',
-            'bigIds' => '',
-            'actionFilter' => 'Browse',
-            'query' => $query,
-        ]);
-
-        Log::info('Scraper xbox-store: result', [
-            'game' => $query,
-            'endpoint' => 'api',
-            'success' => $response->successful(),
-            'http_status' => $response->status(),
-            'response_size' => strlen($response->body()),
-        ]);
-
-        if (!$response->successful()) {
-            return $this->searchXboxFallback($query);
-        }
-
-        $data = $response->json();
-
-        return $this->parseAPIResults($data);
-    }
-
-    private function searchXboxFallback(string $query): array
-    {
-        $url = 'https://www.xbox.com/es-ES/games/store/search?q=' . urlencode($query);
+        $url = 'https://www.xbox.com/en-us/search?q=' . urlencode($query);
 
         $response = Http::withHeaders([
             'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
@@ -128,159 +96,114 @@ class XboxStoreScraper
 
         $html = $response->body();
         $products = [];
+        $data = $this->extractPreloadedState($html);
 
-        if (preg_match('/__NEXT_DATA__.*?>(.*?)<\/script>/s', $html, $match)) {
-            $data = json_decode($match[1], true);
-            if ($data) {
-                $items = $data['props']['pageProps']['searchResults']['products']
-                    ?? $data['props']['pageProps']['products']
-                    ?? [];
+        if (!$data) {
+            return [];
+        }
 
-                foreach ($items as $item) {
-                    $name = $item['title'] ?? $item['name'] ?? null;
-                    if (!$name) {
-                        continue;
-                    }
-
-                    $price = $this->extractPrice($item);
-                    if ($price === null) {
-                        continue;
-                    }
-
-                    $productId = $item['id'] ?? ($item['productId'] ?? '');
-                    $productUrl = $item['url'] ?? "https://www.xbox.com/es-ES/games/store/p/{$productId}";
-
-                    $platform = $this->detectPlatform($item);
-
-                    $products[] = [
-                        'name' => $name,
-                        'price_eur' => $price,
-                        'original_price_eur' => $this->extractOriginalPrice($item, $price),
-                        'discount_percent' => $this->calculateDiscount(
-                            $this->extractOriginalPrice($item, $price),
-                            $price
-                        ),
-                        'url' => $productUrl,
-                        'platform' => $platform,
-                        'in_stock' => ($item['availability'] ?? 'available') !== 'unavailable',
-                    ];
-                }
+        $channelData = $data['core2']['channels']['channelData'] ?? [];
+        $searchKey = null;
+        foreach ($channelData as $key => $value) {
+            if (str_contains($key, 'SEARCH_GAMES')) {
+                $searchKey = $key;
+                break;
             }
         }
 
-        return $products;
-    }
+        if (!$searchKey) {
+            return [];
+        }
 
-    private function parseAPIResults(array $data): array
-    {
-        $products = [];
+        $productList = $channelData[$searchKey]['data']['products'] ?? [];
+        $summaries = $data['core2']['products']['productSummaries'] ?? [];
+        $availabilities = $data['core2']['products']['availabilitySummaries'] ?? [];
 
-        $items = $data['Products']
-            ?? $data['products']
-            ?? $data['data']['products']
-            ?? [];
+        foreach ($productList as $productRef) {
+            $productId = $productRef['productId'] ?? '';
+            if (!$productId || !isset($summaries[$productId])) {
+                continue;
+            }
 
-        foreach ($items as $item) {
-            $name = $item['ProductTitle']
-                ?? $item['Title']
-                ?? $item['Name']
-                ?? $item['productTitle']
-                ?? null;
+            $summary = $summaries[$productId];
+            $name = $summary['title'] ?? null;
             if (!$name) {
                 continue;
             }
 
-            $price = $this->extractPrice($item);
+            $price = null;
+            $originalPrice = null;
+            $discountPercent = 0;
+
+            $specificPrices = $summary['specificPrices']['purchaseable'] ?? [];
+            if (!empty($specificPrices)) {
+                $price = $specificPrices[0]['listPrice'] ?? null;
+                $originalPrice = $specificPrices[0]['msrp'] ?? $price;
+                $discountPercent = $specificPrices[0]['discountPercentage'] ?? 0;
+            } elseif (isset($availabilities[$productId])) {
+                $skuAvail = $availabilities[$productId];
+                $firstSku = reset($skuAvail);
+                $firstAvail = reset($firstSku);
+                $price = $firstAvail['price']['listPrice'] ?? null;
+                $originalPrice = $firstAvail['price']['msrp'] ?? $price;
+                $discountPercent = $firstAvail['price']['discountPercentage'] ?? 0;
+            }
+
             if ($price === null) {
                 continue;
             }
 
-            $productId = $item['ProductId']
-                ?? $item['Id']
-                ?? $item['product-id']
-                ?? '';
-            $productUrl = "https://www.xbox.com/es-ES/games/store/p/{$productId}";
-
-            $platform = $this->detectPlatform($item);
+            $platform = 'Xbox Series X|S';
+            $availableOn = $summary['availableOn'] ?? [];
+            if (in_array('XboxSeriesX', $availableOn) || in_array('XboxSeriesS', $availableOn)) {
+                $platform = 'Xbox Series X|S';
+            } elseif (in_array('XboxOne', $availableOn)) {
+                $platform = 'Xbox One';
+            } elseif (in_array('Xbox360', $availableOn)) {
+                $platform = 'Xbox 360';
+            }
 
             $products[] = [
                 'name' => $name,
-                'price_eur' => $price,
-                'original_price_eur' => $this->extractOriginalPrice($item, $price),
-                'discount_percent' => $this->calculateDiscount(
-                    $this->extractOriginalPrice($item, $price),
-                    $price
-                ),
-                'url' => $productUrl,
+                'price_eur' => (float) $price,
+                'original_price_eur' => (float) $originalPrice,
+                'discount_percent' => (int) $discountPercent,
+                'url' => "https://www.xbox.com/en-us/games/store/p/{$productId}",
                 'platform' => $platform,
-                'in_stock' => ($item['Availability'] ?? $item['availability'] ?? 'available') !== 'unavailable',
+                'in_stock' => true,
             ];
         }
 
         return $products;
     }
 
-    private function extractPrice(array $item): ?float
+    private function extractPreloadedState(string $html): ?array
     {
-        $priceFields = [
-            'DisplayPrice', 'Price', 'SalePrice',
-            'ListPrice', 'MSRP', 'displayPrice',
-            'price', 'salePrice',
-        ];
-
-        foreach ($priceFields as $field) {
-            if (isset($item[$field])) {
-                $val = $item[$field];
-                if (is_array($val)) {
-                    $val = $val['Value'] ?? $val['Amount'] ?? $val['value'] ?? $val['amount'] ?? null;
-                }
-                if ($val !== null && (float) $val > 0) {
-                    return (float) $val;
-                }
-            }
+        if (!preg_match('/window\.__PRELOADED_STATE__\s*=\s*\{/s', $html, $m, PREG_OFFSET_CAPTURE)) {
+            return null;
         }
 
-        $pricing = $item['DisplaySkuAvailabilities'][0]['Availabilities'][0]['OrderManagementData']['Price']
-            ?? $item['Sku']['DisplaySkuAvailabilities'][0]['Availabilities'][0]['OrderManagementData']['Price']
-            ?? null;
+        $start = $m[0][1] + strlen($m[0][0]) - 1;
+        $depth = 0;
+        $end = $start;
+        $length = strlen($html);
 
-        if ($pricing) {
-            $listPrice = $pricing['ListPrice'] ?? $pricing['MSRP'] ?? null;
-            if ($listPrice !== null) {
-                return (float) $listPrice;
-            }
-        }
-
-        return null;
-    }
-
-    private function extractOriginalPrice(array $item, float $salePrice): float
-    {
-        $originalFields = ['OriginalPrice', 'ListPrice', 'MSRP', 'originalPrice', 'listPrice'];
-
-        foreach ($originalFields as $field) {
-            if (isset($item[$field])) {
-                $val = $item[$field];
-                if (is_array($val)) {
-                    $val = $val['Value'] ?? $val['Amount'] ?? $val['value'] ?? $val['amount'] ?? null;
-                }
-                if ($val !== null && (float) $val > 0) {
-                    return (float) $val;
+        for ($i = $start; $i < $length; $i++) {
+            if ($html[$i] === '{') {
+                $depth++;
+            } elseif ($html[$i] === '}') {
+                $depth--;
+                if ($depth === 0) {
+                    $end = $i;
+                    break;
                 }
             }
         }
 
-        $pricing = $item['DisplaySkuAvailabilities'][0]['Availabilities'][0]['OrderManagementData']['Price']
-            ?? null;
+        $jsonStr = substr($html, $start, $end - $start + 1);
+        $data = json_decode($jsonStr, true);
 
-        if ($pricing) {
-            $msrp = $pricing['MSRP'] ?? $pricing['ListPrice'] ?? null;
-            if ($msrp !== null && (float) $msrp > 0) {
-                return (float) $msrp;
-            }
-        }
-
-        return $salePrice;
+        return is_array($data) ? $data : null;
     }
 
     private function calculateDiscount(float $original, float $sale): int

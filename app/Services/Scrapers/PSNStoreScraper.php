@@ -131,39 +131,56 @@ class PSNStoreScraper
         if (preg_match('/__NEXT_DATA__.*?>(.*?)<\/script>/s', $html, $match)) {
             $data = json_decode($match[1], true);
             if ($data) {
-                $items = $data['props']['pageProps']['searchResults']['included'] ?? [];
-                foreach ($items as $item) {
-                    $type = $item['type'] ?? '';
-                    if ($type !== 'game') {
-                        continue;
+                $apolloState = $data['props']['apolloState'] ?? [];
+                $rootQuery = $apolloState['ROOT_QUERY'] ?? [];
+
+                $searchResults = null;
+                foreach ($rootQuery as $key => $value) {
+                    if (str_contains($key, 'universalSearch')) {
+                        $searchResults = $value;
+                        break;
                     }
+                }
 
-                    $name = $item['attributes']['name'] ?? null;
-                    if (!$name) {
-                        continue;
+                if ($searchResults && isset($searchResults['results'])) {
+                    foreach ($searchResults['results'] as $ref) {
+                        $productKey = $ref['__ref'] ?? null;
+                        if (!$productKey || !isset($apolloState[$productKey])) {
+                            continue;
+                        }
+
+                        $item = $apolloState[$productKey];
+                        $name = $item['name'] ?? null;
+                        if (!$name) {
+                            continue;
+                        }
+
+                        $priceData = $item['price'] ?? null;
+                        if (!$priceData) {
+                            continue;
+                        }
+
+                        $basePrice = $this->parsePriceString($priceData['basePrice'] ?? null);
+                        $discountedPrice = $this->parsePriceString($priceData['discountedPrice'] ?? null);
+
+                        if ($discountedPrice === null) {
+                            continue;
+                        }
+
+                        $sku = $item['id'] ?? '';
+                        $platforms = $item['platforms'] ?? ['PS5'];
+                        $platform = in_array('PS5', $platforms) ? 'PS5' : ($platforms[0] ?? 'PS5');
+
+                        $products[] = [
+                            'name' => $name,
+                            'price_eur' => $discountedPrice,
+                            'original_price_eur' => $basePrice ?? $discountedPrice,
+                            'discount_percent' => $this->calculateDiscount($basePrice ?? $discountedPrice, $discountedPrice),
+                            'url' => "https://store.playstation.com/es-es/product/{$sku}",
+                            'platform' => $platform,
+                            'in_stock' => true,
+                        ];
                     }
-
-                    $price = $this->extractPriceFromAttributes($item['attributes'] ?? []);
-                    if ($price === null) {
-                        continue;
-                    }
-
-                    $sku = $item['id'] ?? '';
-                    $platforms = $item['attributes']['platforms'] ?? ['PS5'];
-                    $platform = in_array('PS5', $platforms) ? 'PS5' : ($platforms[0] ?? 'PS5');
-
-                    $products[] = [
-                        'name' => $name,
-                        'price_eur' => $price,
-                        'original_price_eur' => $this->extractOriginalPriceFromAttributes($item['attributes'] ?? [], $price),
-                        'discount_percent' => $this->calculateDiscount(
-                            $this->extractOriginalPriceFromAttributes($item['attributes'] ?? [], $price),
-                            $price
-                        ),
-                        'url' => "https://store.playstation.com/es-es/product/{$sku}",
-                        'platform' => $platform,
-                        'in_stock' => true,
-                    ];
                 }
             }
         }
@@ -171,100 +188,16 @@ class PSNStoreScraper
         return $products;
     }
 
-    private function parseAPIResults(array $data): array
+    private function parsePriceString(?string $priceStr): ?float
     {
-        $products = [];
-
-        $links = $data['data']['attributes']['search-results']['links'] ?? [];
-
-        if (empty($links)) {
-            $links = $data['included'] ?? [];
-        }
-
-        foreach ($links as $item) {
-            $name = $item['attributes']['name']
-                ?? $item['title']
-                ?? null;
-            if (!$name) {
-                continue;
-            }
-
-            $price = $this->extractPriceFromAttributes($item['attributes'] ?? []);
-            if ($price === null) {
-                continue;
-            }
-
-            $originalPrice = $this->extractOriginalPriceFromAttributes($item['attributes'] ?? [], $price);
-            $sku = $item['id'] ?? ($item['attributes']['product-id'] ?? '');
-
-            $platforms = $item['attributes']['platforms'] ?? [];
-            $platform = in_array('PS5', $platforms) ? 'PS5' : ($platforms[0] ?? 'PS5');
-
-            $products[] = [
-                'name' => $name,
-                'price_eur' => $price,
-                'original_price_eur' => $originalPrice,
-                'discount_percent' => $this->calculateDiscount($originalPrice, $price),
-                'url' => "https://store.playstation.com/es-es/product/{$sku}",
-                'platform' => $platform,
-                'in_stock' => ($item['attributes']['is-purchasable'] ?? true) === true,
-            ];
-        }
-
-        return $products;
-    }
-
-    private function extractPriceFromAttributes(array $attrs): ?float
-    {
-        $price = $attrs['price']
-            ?? $attrs['sale-price']
-            ?? $attrs['current-price']
-            ?? $attrs['skus'][0]['prices']['sale-price']
-            ?? $attrs['skus'][0]['prices']['plus-price']
-            ?? null;
-
-        if ($price === null) {
-            $bp = $attrs['bucket-price'] ?? null;
-            if (is_array($bp)) {
-                $price = $bp['sale-price'] ?? $bp['base-price'] ?? null;
-            }
-        }
-
-        if ($price === null) {
+        if (!$priceStr) {
             return null;
         }
 
-        if (is_array($price)) {
-            $price = $price['value'] ?? $price['amount'] ?? null;
-        }
+        $cleaned = preg_replace('/[^0-9,]/', '', $priceStr);
+        $cleaned = str_replace(',', '.', $cleaned);
 
-        return $price !== null ? (float) $price : null;
-    }
-
-    private function extractOriginalPriceFromAttributes(array $attrs, float $salePrice): float
-    {
-        $original = $attrs['original-price']
-            ?? $attrs['base-price']
-            ?? $attrs['list-price']
-            ?? $attrs['skus'][0]['prices']['base-price']
-            ?? null;
-
-        if ($original === null) {
-            $bp = $attrs['bucket-price'] ?? null;
-            if (is_array($bp)) {
-                $original = $bp['base-price'] ?? $bp['original-price'] ?? null;
-            }
-        }
-
-        if ($original === null) {
-            return $salePrice;
-        }
-
-        if (is_array($original)) {
-            $original = $original['value'] ?? $original['amount'] ?? null;
-        }
-
-        return $original !== null ? (float) $original : $salePrice;
+        return is_numeric($cleaned) ? (float) $cleaned : null;
     }
 
     private function calculateDiscount(float $original, float $sale): int
