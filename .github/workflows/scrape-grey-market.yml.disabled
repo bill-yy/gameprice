@@ -1,3 +1,0 @@
-# DISABLED: This workflow was failing because GitHub Actions IPs are blocked by Cloudflare.
-# Replaced by Laravel command 'prices:scrape-real' which runs on the Dokploy server.
-# See app/Console/Commands/ScrapeRealPrices.php
