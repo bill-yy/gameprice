@@ -3,6 +3,7 @@
 use App\Http\Middleware\ApiKeyMiddleware;
 use App\Http\Middleware\RateLimitMiddleware;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Artisan;
 use App\Http\Controllers\Api\V1\SearchController;
 use App\Http\Controllers\Api\V1\StoreController;
 use App\Http\Controllers\Api\V1\WebhookController;
@@ -34,3 +35,25 @@ Route::prefix('v1')->group(function () {
         Route::delete('/keys/{id}', [ApiDashboardController::class, 'revokeKey']);
     });
 });
+
+// Temporary debug endpoint — REMOVE AFTER VERIFICATION
+Route::post('/admin/run-scraper', function () {
+    $source = request('source', 'itad');
+    $limit = (int) request('limit', 5);
+    
+    \Illuminate\Support\Facades\Log::info('Manual scraper triggered via API', [
+        'source' => $source,
+        'limit' => $limit,
+    ]);
+    
+    $exitCode = Artisan::call('prices:scrape-real', [
+        '--source' => $source,
+        '--limit' => $limit,
+    ]);
+    
+    return response()->json([
+        'success' => $exitCode === 0,
+        'exit_code' => $exitCode,
+        'output' => Artisan::output(),
+    ]);
+})->middleware([ApiKeyMiddleware::class, RateLimitMiddleware::class]);
