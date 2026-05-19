@@ -94,12 +94,16 @@ class SearchController extends Controller
                             }
                         }
                         
-                        // Require at least half of significant words to match (minimum 1)
-                        $requiredMatches = max(1, ceil(count($significantWords) / 2));
+                        // Require ALL significant words to match if query has 2+ words
+                        // This prevents "elden ring" matching "The Solar Ring"
+                        // For single-word queries, require just 1 match
+                        $requiredMatches = count($significantWords) >= 2 
+                            ? count($significantWords) 
+                            : 1;
                         
-                        // For very short queries (all words < 3 chars), use simple contains
+                        // For very short queries (all words < 3 chars), allow anything
                         if (empty($significantWords)) {
-                            return true; // Query is too short to filter meaningfully
+                            return true;
                         }
                         
                         return $matchCount >= $requiredMatches;
@@ -207,7 +211,10 @@ class SearchController extends Controller
         $significantWords = array_filter($queryWords, fn($w) => strlen($w) >= 3);
         
         if (!empty($significantWords)) {
-            $requiredMatches = max(1, ceil(count($significantWords) / 2));
+            // Require ALL significant words to match if query has 2+ words
+            $requiredMatches = count($significantWords) >= 2 
+                ? count($significantWords) 
+                : 1;
             $results = array_filter($results, function ($r) use ($significantWords, $requiredMatches) {
                 $name = strtolower($r['name'] ?? '');
                 $matchCount = 0;
